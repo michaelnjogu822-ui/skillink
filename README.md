@@ -87,3 +87,7 @@ The tests use an isolated in-memory SQLite database and cover the client-to-free
 ## Payment and deployment notes
 
 There is no simulated payment flow. `transactions` records are structured for a provider integration, but payment authorization, settlement, refunds and M-Pesa Daraja callbacks still require provider credentials and implementation. Production mode requires `SECRET_KEY`; configure a production database, HTTPS, secure cookies, backups and managed file storage before deployment. Real-time messaging, email delivery, AI recommendations and M-Pesa integration remain future extensions.
+
+## License
+
+Released under the Apache License 2.0. See [LICENSE](LICENSE).
