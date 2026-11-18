@@ -110,7 +110,35 @@ Key integrity rules enforced by the database, not only by Python:
 These constraints are why the app can trust the database even if a future route forgets a
 check.
 
-## 6. Security model
+## 6. Payments and escrow
+
+Money never moves inside a route. A route validates who is asking, locks the project row,
+and calls `app/services/escrow.py`, which calls a `PaymentProvider`.
+
+```
+Client funds      charge()   client  -> escrow      transactions.status = held
+Client approves   payout()   escrow  -> freelancer  transactions.status = released
+Client cancels    refund()   escrow  -> client      transactions.status = refunded
+```
+
+Properties this design gives us:
+
+| Property | How it is guaranteed |
+|---|---|
+| One escrow record per project | `escrow_transaction()` lookup inside the route's `SELECT ... FOR UPDATE` transaction |
+| Amounts cannot drift | The transaction copies `project.agreed_amount`; there is no amount input in the request |
+| Only the client can fund/cancel | `@role_required("client")` plus an explicit `project.client_id == current_user.id` check |
+| Work cannot be approved unfunded | `complete_project` refuses unless the escrow state is `held`, then releases in the same transaction |
+| Cancelling refunds held money | `cancel_project` refunds only when the state is `held`, so an unfunded cancellation writes nothing |
+| Illegal statuses are impossible | `ck_transactions_status` allows only `pending, held, released, succeeded, failed, refunded`; `ck_transactions_kind` allows only `manual, escrow` |
+| Provider can be replaced | Routes depend on the `PaymentProvider` interface; `PROVIDERS` maps a name to a class and `PAYMENT_PROVIDER` selects it |
+| A repeated request cannot double-charge | The second `fund` finds an existing `held`/`released` record and returns a warning |
+
+Escrow rows are `kind = 'escrow'`; rows imported or recorded outside the flow are
+`kind = 'manual'`. Freelancer earnings count `released` and legacy `succeeded` money, so
+funds sitting in escrow are visible but are never counted as earned.
+
+## 7. Security model
 
 | Threat | Control |
 |---|---|
@@ -126,6 +154,7 @@ check.
 | Privilege escalation | Role checks on every admin route plus ownership checks (a client can only edit their own job) |
 | Suspended accounts | `load_user` returns `None` for inactive users, and admin suspension clears their sessions |
 | Production misconfiguration | The app refuses to boot in production without a strong `SECRET_KEY`, a server database, and secure cookies |
+| Payment tampering | Amounts come from the project row, transitions are checked by the service and by database CHECK constraints, and every state change runs under a row lock |
 
 Limitations to state honestly in a defence:
 
@@ -134,10 +163,10 @@ Limitations to state honestly in a defence:
 - `request.remote_addr` is the direct client. Behind a proxy, configure trusted proxies so
   the real address is used.
 - File uploads are stored on local disk. Production should use object storage.
-- There is no payment authorisation yet: `transactions` records are a ledger, not a
-  provider integration.
+- Escrow is simulated. A live provider must add authorisation, callbacks, reconciliation and
+  refund handling; the interface is ready for it but the provider is not.
 
-## 7. Configuration
+## 8. Configuration
 
 Configuration comes from environment variables, loaded by `run.py` through `python-dotenv`.
 
@@ -150,8 +179,9 @@ Configuration comes from environment variables, loaded by `run.py` through `pyth
 | `APP_ENV` | `production` enables `ProductionConfig` and its startup checks. |
 | `LOGIN_MAX_FAILURES` | Failed sign-ins allowed per email and client address (default 5). |
 | `LOGIN_WINDOW_SECONDS` | Length of that window in seconds (default 300). |
+| `PAYMENT_PROVIDER` | Provider used for escrow (default `simulated`). |
 
-## 8. Running and testing
+## 9. Running and testing
 
 ```powershell
 py -m venv .venv
@@ -167,6 +197,7 @@ flask run
 ```powershell
 python -m unittest discover -v        # full suite
 python -m unittest tests.test_login_security -v   # one module
+python -m unittest tests.test_escrow_payments -v   # escrow lifecycle
 ```
 
 The suite builds its own application with an in-memory SQLite database, so it never touches

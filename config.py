@@ -16,6 +16,9 @@ class Config:
     SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "false").lower() == "true"
     LOGIN_MAX_FAILURES = int(os.environ.get("LOGIN_MAX_FAILURES", "5"))
     LOGIN_WINDOW_SECONDS = int(os.environ.get("LOGIN_WINDOW_SECONDS", "300"))
+    # Payment provider used by the escrow service. Only "simulated" ships with
+    # the project; a real provider registers itself in app/services/escrow.py.
+    PAYMENT_PROVIDER = os.environ.get("PAYMENT_PROVIDER", "simulated")
 
 
 class DevelopmentConfig(Config):

@@ -145,6 +145,10 @@ class MarketplaceWorkflowTest(unittest.TestCase):
         self.assertEqual(response.status_code, 409)
         response = self.post_with_csrf(self.freelancer_browser, f"/projects/{project_id}/submit", {}, follow_redirects=True)
         self.assertEqual(response.status_code, 200)
+        unfunded = self.post_with_csrf(self.client_browser, f"/projects/{project_id}/complete", {}, follow_redirects=True)
+        self.assertIn(b"Fund the escrow", unfunded.data)
+        funded = self.post_with_csrf(self.client_browser, f"/projects/{project_id}/fund", {}, follow_redirects=True)
+        self.assertIn(b"Held in escrow", funded.data)
         response = self.post_with_csrf(self.client_browser, f"/projects/{project_id}/complete", {}, follow_redirects=True)
         self.assertEqual(response.status_code, 200)
         response = self.post_with_csrf(self.client_browser, f"/projects/{project_id}/review", {

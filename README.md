@@ -66,6 +66,7 @@ Open `http://127.0.0.1:5000`. `python run.py` also starts the development server
 - Client job posting and freelancer search/filter by text, category, location and budget.
 - Applications, shortlisting, rejection, withdrawal, freelancer application tracking, and hiring.
 - Project tracking, participant-only messaging, freelancer work submission and client completion approval.
+- Escrow payments: the client funds the agreed amount (held), work cannot be approved until it is funded, approval releases the money to the freelancer, and cancelling a funded project refunds the client. An administrator ledger shows every payment.
 - Project reviews and freelancer rating averages.
 - Notifications, member reports and admin moderation for users and jobs.
 - Role-specific dashboards with counts and earnings derived from succeeded transaction records.
@@ -86,7 +87,7 @@ The tests use an isolated in-memory SQLite database and cover the client-to-free
 
 ## Payment and deployment notes
 
-There is no simulated payment flow. `transactions` records are structured for a provider integration, but payment authorization, settlement, refunds and M-Pesa Daraja callbacks still require provider credentials and implementation. Production mode requires `SECRET_KEY`; configure a production database, HTTPS, secure cookies, backups and managed file storage before deployment. Real-time messaging, email delivery, AI recommendations and M-Pesa integration remain future extensions.
+Escrow payments are simulated, not settled by a real provider. `app/services/escrow.py` implements the fund/release/refund lifecycle behind a `PaymentProvider` interface and ships with `SimulatedProvider`, which settles instantly and returns references like `SIM-DEP-1A2B3C4D5E6F`. Registering M-Pesa Daraja means implementing `charge`, `payout` and `refund` for that provider and setting `PAYMENT_PROVIDER`; no route or template changes. Real collection still requires Daraja credentials, callbacks and reconciliation. Production mode requires `SECRET_KEY`; configure a production database, HTTPS, secure cookies, backups and managed file storage before deployment. Real-time messaging, email delivery, AI recommendations and M-Pesa integration remain future extensions.
 
 ## License
 

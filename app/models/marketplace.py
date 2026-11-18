@@ -175,6 +175,7 @@ class Project(TimestampMixin, db.Model):
     client = db.relationship("User", foreign_keys=[client_id])
     freelancer = db.relationship("User", foreign_keys=[freelancer_id])
     messages = db.relationship("Message", back_populates="project", cascade="all, delete-orphan")
+    transactions = db.relationship("Transaction", back_populates="project", order_by="Transaction.id")
     __table_args__ = (
         db.CheckConstraint("status IN ('active', 'submitted', 'completed', 'cancelled', 'disputed')", name="ck_projects_status"),
         db.CheckConstraint("agreed_amount > 0", name="ck_projects_amount_positive"),
@@ -223,23 +224,41 @@ class Review(TimestampMixin, db.Model):
 
 
 class Transaction(TimestampMixin, db.Model):
+    """A payment record.
+
+    Escrow payments follow a lifecycle: ``held`` while the client's money is
+    held by the platform, then ``released`` to the freelancer when the client
+    approves the work, or ``refunded`` to the client when the project is
+    cancelled. Rows with kind ``manual`` are direct payments recorded outside
+    the escrow flow (for example imported history) and use ``succeeded``.
+    """
+
     __tablename__ = "transactions"
+    KIND_MANUAL = "manual"
+    KIND_ESCROW = "escrow"
+    ESCROW_STATUSES = ("held", "released", "refunded")
     id = db.Column(db.Integer, primary_key=True)
     project_id = db.Column(db.Integer, db.ForeignKey("projects.id", ondelete="RESTRICT"), nullable=False, index=True)
     payer_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     payee_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     amount = db.Column(db.Numeric(12, 2), nullable=False)
     currency = db.Column(db.String(3), nullable=False, default="KES")
+    kind = db.Column(db.String(20), nullable=False, default=KIND_MANUAL, server_default=KIND_MANUAL, index=True)
     provider = db.Column(db.String(40), nullable=False, default="unconfigured")
     provider_reference = db.Column(db.String(160), unique=True)
+    settlement_reference = db.Column(db.String(160), unique=True, index=True)
     status = db.Column(db.String(20), nullable=False, default="pending", index=True)
-    project = db.relationship("Project")
+    project = db.relationship("Project", back_populates="transactions")
     payer = db.relationship("User", foreign_keys=[payer_id])
     payee = db.relationship("User", foreign_keys=[payee_id])
     __table_args__ = (
         db.CheckConstraint("amount > 0", name="ck_transactions_positive_amount"),
-        db.CheckConstraint("status IN ('pending', 'succeeded', 'failed', 'refunded')", name="ck_transactions_status"),
+        db.CheckConstraint(
+            "status IN ('pending', 'held', 'released', 'succeeded', 'failed', 'refunded')",
+            name="ck_transactions_status",
+        ),
         db.CheckConstraint("payer_id != payee_id", name="ck_transactions_distinct_members"),
+        db.CheckConstraint("kind IN ('manual', 'escrow')", name="ck_transactions_kind"),
     )
 
 

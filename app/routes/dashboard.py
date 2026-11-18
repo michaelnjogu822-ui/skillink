@@ -79,8 +79,9 @@ def index():
             recent_jobs.extend(fallback.order_by(Job.created_at.desc()).limit(5 - len(recent_jobs)).all())
         fields = [current_user.location, profile.headline, profile.bio, profile.university, profile.hourly_rate]
         completion = int(sum(value not in (None, "") for value in fields) * 100 / len(fields))
-        earned = db.session.query(Transaction.currency, db.func.sum(Transaction.amount)).filter_by(
-            payee_id=current_user.id, status="succeeded"
+        earned = db.session.query(Transaction.currency, db.func.sum(Transaction.amount)).filter(
+            Transaction.payee_id == current_user.id,
+            Transaction.status.in_(("succeeded", "released")),
         ).group_by(Transaction.currency).all()
         earned_label = ", ".join(f"{currency} {amount:,.2f}" for currency, amount in earned) or "No payments yet"
         stats = [("Applications", applications), ("Active projects", active), ("Completed", completed), ("Earnings", earned_label)]
@@ -311,11 +312,11 @@ def earnings():
     if current_user.role == "freelancer":
         role_column = Transaction.payee_id
         title = "Earnings"
-        description = "Payments recorded as successfully paid to you."
+        description = "Escrow payments released to you, plus any directly recorded payments."
     elif current_user.role == "client":
         role_column = Transaction.payer_id
         title = "Project spending"
-        description = "Payments recorded as successfully paid for your projects."
+        description = "Amounts you funded, paid out to freelancers, or had refunded. Held amounts are not counted as paid yet."
     else:
         abort(403)
     transactions = Transaction.query.filter(role_column == current_user.id).order_by(Transaction.created_at.desc()).limit(100).all()
@@ -324,6 +325,19 @@ def earnings():
     ).group_by(Transaction.currency, Transaction.status).all()
     return render_template("dashboard/earnings.html", transactions=transactions, totals=totals,
                            title=title, description=description)
+
+
+@dashboard_bp.get("/admin/payments")
+@roles_required("admin")
+def admin_payments():
+    transactions = Transaction.query.order_by(Transaction.created_at.desc()).limit(200).all()
+    totals = db.session.query(Transaction.currency, Transaction.status, db.func.sum(Transaction.amount)).group_by(
+        Transaction.currency, Transaction.status
+    ).all()
+    held = db.session.query(Transaction.currency, db.func.sum(Transaction.amount)).filter_by(
+        status="held"
+    ).group_by(Transaction.currency).all()
+    return render_template("dashboard/admin_payments.html", transactions=transactions, totals=totals, held=held)
 
 
 @dashboard_bp.get("/admin/users")

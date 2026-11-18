@@ -25,29 +25,33 @@ Acceptance criteria - met:
 - A successful sign-in resets the counter, and the counter is scoped per email and address.
 - Uploads resolve to one location regardless of the working directory.
 
-## Phase 2 - Escrow payments (simulated)  (NEXT)
+## Phase 2 - Escrow payments (simulated)  (COMPLETE)
 
 **Goal:** make money movement visible and safe before any real provider is connected.
 
-Scope:
+Delivered:
 
-1. Project funding: the client records a funding intent for the agreed amount; a `transactions`
-   row is created as `pending` and moves to `succeeded` only when the simulated provider confirms.
-2. Release on completion: when the client approves submitted work, the held amount is paid out
-   and the project closes.
-3. Refund on cancellation: cancelling a funded project returns the money with a `refunded` record.
-4. Ledger page: each participant sees their payments against a project; admins see all records.
-5. A `PaymentProvider` interface with one `SimulatedProvider` implementation, so replacing it with
-   M-Pesa Daraja later touches one class rather than the routes.
+- `app/services/escrow.py` with a `PaymentProvider` interface, a `SimulatedProvider` that
+  settles instantly, a provider registry, and `fund_project` / `release_escrow` /
+  `refund_escrow` transitions.
+- `transactions.kind` (`manual` or `escrow`) and `transactions.settlement_reference`, plus a
+  widened status CHECK allowing `held` and `released` (migration `c3f8a1d64e21`).
+- Client funding on the project page, gated approval that releases payment to the freelancer,
+  and cancellation that refunds held money to the client.
+- Freelancer earnings count released money only, so funds still held are never reported as
+  earned; the client's spending page shows held, released and refunded records.
+- An administrator ledger at `/admin/payments` listing every deposit, release and refund.
+- 20 new tests in `tests/test_escrow_payments.py`; the suite is 46 tests.
 
-Acceptance criteria:
+Acceptance criteria - met:
 
-- Only the project's client can fund it; only one successful funding per project.
-- A project cannot be completed unless it is funded, and cannot be funded twice.
-- Amounts in the ledger always equal the project's agreed amount.
-- Integration tests cover funding, double funding, release, refund, and unauthorised access.
+- Only the project's client can fund it, and a second funding attempt is refused.
+- Work cannot be approved before the escrow is funded; approval releases the exact agreed amount.
+- Cancelling a funded project refunds it; cancelling an unfunded project writes no transaction.
+- Ledger amounts always equal the project's agreed amount.
+- Illegal statuses are rejected by the database, not only by Python.
 
-## Phase 3 - Messaging and notifications
+## Phase 3 - Messaging and notifications  (NEXT)
 
 **Goal:** conversations that feel instant without a second technology stack.
 

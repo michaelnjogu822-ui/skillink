@@ -12,12 +12,12 @@
     <div class="col-12"><div class="empty-state"><p>No payment records yet. Project values are not counted as paid until a successful transaction is recorded.</p></div></div>
     {% endfor %}
   </div>
-  <div class="section-heading"><div><h2>Transaction history</h2><p class="text-secondary">Latest 100 payment records.</p></div></div>
+  <div class="section-heading"><div><h2>Transaction history</h2><p class="text-secondary">Latest 100 payment records. Escrow funds appear as <strong>held</strong> until the client approves the work, then <strong>released</strong>, or <strong>refunded</strong> if the project is cancelled.</p></div></div>
   <div class="row g-3">
     {% for transaction in transactions %}
     <div class="col-12"><article class="job-card d-flex flex-wrap justify-content-between gap-3 align-items-center">
-      <div><h3 class="h6 mb-1"><a href="{{ url_for('marketplace.project_detail', project_id=transaction.project_id) }}">{{ transaction.project.job.title }}</a></h3><small class="text-secondary">{{ transaction.provider|title }}{% if transaction.provider_reference %} · {{ transaction.provider_reference }}{% endif %} · {{ transaction.created_at.strftime('%d %b %Y') }}</small></div>
-      <div class="text-end"><strong>{{ transaction.currency }} {{ '{:,.2f}'.format(transaction.amount) }}</strong><div><span class="pill">{{ transaction.status|title }}</span></div></div>
+      <div><h3 class="h6 mb-1"><a href="{{ url_for('marketplace.project_detail', project_id=transaction.project_id) }}">{{ transaction.project.job.title }}</a></h3><small class="text-secondary">{{ transaction.provider|title }}{% if transaction.provider_reference %} · deposit {{ transaction.provider_reference }}{% endif %}{% if transaction.settlement_reference %} · settlement {{ transaction.settlement_reference }}{% endif %} · {{ transaction.created_at.strftime('%d %b %Y') }}</small></div>
+      <div class="text-end"><strong>{{ transaction.currency }} {{ '{:,.2f}'.format(transaction.amount) }}</strong><div><span class="pill">{{ transaction.status|title }}</span>{% if transaction.kind == 'escrow' %} <span class="pill pill-green">Escrow</span>{% endif %}</div></div>
     </article></div>
     {% else %}<div class="empty-state"><p>No transactions to show.</p></div>{% endfor %}
   </div>

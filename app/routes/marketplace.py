@@ -15,8 +15,18 @@ from app.extensions import db
 from app.forms import ApplicationForm, JobForm, MessageForm, ReviewForm
 from app.models import (FreelancerProfile, FreelancerSkill, Job, JobApplication,
                         Message, Notification, Project, Review, Skill, User)
+from app.services import escrow
+from app.services.escrow import PaymentError
 
 marketplace_bp = Blueprint("marketplace", __name__)
+
+
+def locked_project(project_id):
+    """Load a project with a row lock so two payments cannot race each other."""
+    return db.session.execute(
+        db.select(Project).where(Project.id == project_id).with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one_or_none()
 
 
 def budget_filter(name):
@@ -261,8 +271,11 @@ def project_detail(project_id):
         db.session.commit()
     counterpart_id = project.freelancer_id if current_user.id == project.client_id else project.client_id
     counterpart_review = Review.query.filter_by(project_id=project.id, reviewer_id=counterpart_id).first()
+    escrow_record = escrow.escrow_transaction(project)
     return render_template("marketplace/project.html", project=project, form=form, review_form=review_form,
-                           review_exists=review_exists, counterpart_review=counterpart_review)
+                           review_exists=review_exists, counterpart_review=counterpart_review,
+                           escrow_record=escrow_record, escrow_state=escrow.escrow_state(project),
+                           escrow_labels=escrow.STATE_LABELS)
 
 
 @marketplace_bp.post("/projects/<int:project_id>/messages")
@@ -288,25 +301,85 @@ def send_message(project_id):
     return redirect(url_for("marketplace.project_detail", project_id=project.id) + "#messages")
 
 
+@marketplace_bp.post("/projects/<int:project_id>/fund")
+@role_required("client")
+def fund_project_escrow(project_id):
+    project = locked_project(project_id)
+    if project is None:
+        abort(404)
+    if project.client_id != current_user.id:
+        abort(403)
+    try:
+        escrow.fund_project(project, current_user)
+        db.session.commit()
+    except PaymentError as error:
+        db.session.rollback()
+        flash(str(error), "warning")
+        return redirect(url_for("marketplace.project_detail", project_id=project.id))
+    flash("Payment received. The money is held in escrow until you approve the work.", "success")
+    return redirect(url_for("marketplace.project_detail", project_id=project.id))
+
+
+@marketplace_bp.post("/projects/<int:project_id>/cancel")
+@role_required("client")
+def cancel_project(project_id):
+    project = locked_project(project_id)
+    if project is None:
+        abort(404)
+    if project.client_id != current_user.id:
+        abort(403)
+    if project.status not in ("active", "submitted"):
+        abort(409)
+    refunded = False
+    try:
+        if escrow.escrow_state(project) == "held":
+            escrow.refund_escrow(project)
+            refunded = True
+    except PaymentError as error:
+        db.session.rollback()
+        flash(str(error), "danger")
+        return redirect(url_for("marketplace.project_detail", project_id=project.id))
+    project.status = "cancelled"
+    project.job.status = "cancelled"
+    db.session.add(Notification(
+        user_id=project.freelancer_id,
+        kind="project_cancelled",
+        message=f"{project.job.title} was cancelled by the client.",
+        target_url=url_for("dashboard.projects"),
+    ))
+    db.session.commit()
+    message = "Project cancelled."
+    if refunded:
+        message += " The escrow amount was refunded to you."
+    flash(message, "info")
+    return redirect(url_for("marketplace.project_detail", project_id=project.id))
+
+
 @marketplace_bp.post("/projects/<int:project_id>/complete")
 @role_required("client")
 def complete_project(project_id):
-    project = db.session.execute(
-        db.select(Project).where(Project.id == project_id).with_for_update()
-        .execution_options(populate_existing=True)
-    ).scalar_one_or_none()
+    project = locked_project(project_id)
     if project is None:
         abort(404)
     if project.client_id != current_user.id:
         abort(403)
     if project.status != "submitted":
         abort(409)
+    if escrow.escrow_state(project) != "held":
+        flash("Fund the escrow before you approve the work.", "warning")
+        return redirect(url_for("marketplace.project_detail", project_id=project.id))
+    try:
+        escrow.release_escrow(project)
+    except PaymentError as error:
+        db.session.rollback()
+        flash(str(error), "danger")
+        return redirect(url_for("marketplace.project_detail", project_id=project.id))
     project.status = "completed"
     project.completed_at = datetime.now(timezone.utc)
     project.job.status = "completed"
     db.session.add(Notification(user_id=project.freelancer_id, kind="project_completed", message=f"{project.job.title} was marked complete.", target_url=url_for("marketplace.project_detail", project_id=project.id)))
     db.session.commit()
-    flash("Project marked complete. You can both leave a review.", "success")
+    flash("Project marked complete. The escrow payment was released to the freelancer.", "success")
     return redirect(url_for("marketplace.project_detail", project_id=project.id))
 
 

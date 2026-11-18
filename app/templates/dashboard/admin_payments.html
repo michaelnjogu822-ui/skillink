@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block title %}Payments · Administration · SkillLink{% endblock %}
+{% block content %}
+<main id="main-content" tabindex="-1" class="container section-pad">
+  <span class="eyebrow">ADMINISTRATION</span>
+  <h1>Payment ledger</h1>
+  <p class="text-secondary">Every escrow deposit, release and refund on the platform, newest first.</p>
+  <div class="row g-3 mt-2 mb-5">
+    {% for currency, amount in held %}
+    <div class="col-sm-6 col-lg-3"><div class="stat-card"><small>{{ currency }} · Held in escrow</small><strong>{{ '{:,.2f}'.format(amount) }}</strong></div></div>
+    {% endfor %}
+    {% for currency, status, amount in totals %}
+    <div class="col-sm-6 col-lg-3"><div class="stat-card"><small>{{ currency }} · {{ status|title }}</small><strong>{{ '{:,.2f}'.format(amount) }}</strong></div></div>
+    {% else %}
+    <div class="col-12"><div class="empty-state"><p>No payment records yet.</p></div></div>
+    {% endfor %}
+  </div>
+  <div class="table-wrap">
+    <table class="table align-middle">
+      <thead><tr><th>Date</th><th>Project</th><th>Client</th><th>Freelancer</th><th>Amount</th><th>Status</th><th>Reference</th></tr></thead>
+      <tbody>
+        {% for transaction in transactions %}
+        <tr>
+          <td><small>{{ transaction.created_at.strftime('%d %b %Y') }}</small></td>
+          <td><a href="{{ url_for('marketplace.project_detail', project_id=transaction.project_id) }}">{{ transaction.project.job.title }}</a></td>
+          <td><small>{{ transaction.payer.full_name }}</small></td>
+          <td><small>{{ transaction.payee.full_name }}</small></td>
+          <td>{{ transaction.currency }} {{ '{:,.2f}'.format(transaction.amount) }}</td>
+          <td><span class="pill">{{ transaction.status|title }}</span>{% if transaction.kind == 'escrow' %} <span class="pill pill-green">Escrow</span>{% endif %}</td>
+          <td><small>{{ transaction.provider_reference or '—' }}{% if transaction.settlement_reference %}<br>{{ transaction.settlement_reference }}{% endif %}</small></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-secondary">No transactions to show.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</main>
+{% endblock %}
