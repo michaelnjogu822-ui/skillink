@@ -1,0 +1,11 @@
+{% macro field_control(field, class_name='form-control', rows=None, placeholder=None, accept=None, label=None, describedby=None) -%}
+  <label class="form-label" for="{{ field.id }}">{{ label or field.label.text }}</label>
+  {{ field(class_=class_name, rows=rows, placeholder=placeholder, accept=accept,
+    **{'aria-invalid': 'true' if field.errors else 'false',
+       'aria-describedby': ' '.join(([field.id ~ '-errors'] if field.errors else []) + ([describedby] if describedby else [])) or None}) }}
+  {% if field.errors %}
+    <div class="field-error" id="{{ field.id }}-errors" role="alert">
+      {% for error in field.errors %}<div>{{ error }}</div>{% endfor %}
+    </div>
+  {% endif %}
+{%- endmacro %}

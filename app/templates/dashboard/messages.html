@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Messages · SkillLink{% endblock %}
+{% block content %}
+<main id="main-content" tabindex="-1" class="container section-pad narrow">
+  <span class="eyebrow">PROJECT CONVERSATIONS</span>
+  <h1>Messages</h1>
+  <p class="text-secondary">Keep project communication and updates in one place.</p>
+  {% for project, latest, unread in conversations %}
+  <a class="notification-row notification-link {% if unread %}unread{% endif %}" href="{{ url_for('marketplace.project_detail', project_id=project.id) }}#messages">
+    <span class="notification-icon"><i class="fa-regular fa-comments"></i></span>
+    <div class="flex-grow-1">
+      <strong>{{ project.job.title }}{% if unread %} · {{ unread }} unread{% endif %}</strong>
+      <small>{{ latest.sender.full_name }} · {{ latest.body|truncate(130) }} · {{ latest.created_at.strftime('%d %b %Y, %H:%M') }}</small>
+    </div>
+  </a>
+  {% else %}
+  <div class="empty-state"><i class="fa-regular fa-comments"></i><h2>No conversations yet</h2><p>Project messages will appear here when you start collaborating.</p><a class="btn btn-primary" href="{{ url_for('dashboard.projects') }}">View projects</a></div>
+  {% endfor %}
+</main>
+{% endblock %}

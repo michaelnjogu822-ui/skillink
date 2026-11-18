@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% import 'macros/forms.html' as forms %}
+{% block title %}Create account · SkillLink{% endblock %}
+{% block content %}
+<main id="main-content" tabindex="-1">
+  <section class="auth-wrap" aria-labelledby="register-title">
+    <div class="auth-card">
+      <span class="eyebrow">JOIN THE COMMUNITY</span>
+      <h1 id="register-title">Create your account</h1>
+      <p class="text-secondary">Get started as a student freelancer or a client.</p>
+      <form method="post" novalidate>
+        {{ form.hidden_tag() }}
+        {% for field in [form.full_name, form.email, form.role, form.password, form.confirm_password] %}
+          <div class="mb-3">{{ forms.field_control(field, class_name='form-select' if field.name == 'role' else 'form-control', placeholder=field.label.text, describedby='password-guidance' if field.name in ['password', 'confirm_password'] else None) }}</div>
+        {% endfor %}
+        <p class="form-hint mb-3" id="password-guidance">Use at least 10 characters, including a letter and a number.</p>
+        {{ form.submit(class_='btn btn-primary w-100 btn-lg') }}
+      </form>
+      <p class="text-center mt-4 mb-0">Already have an account? <a href="{{ url_for('auth.login') }}">Log in</a></p>
+    </div>
+  </section>
+</main>
+{% endblock %}

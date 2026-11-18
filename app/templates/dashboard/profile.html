@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% import 'macros/forms.html' as forms %}
+{% block title %}Edit profile · SkillLink{% endblock %}
+{% block content %}
+<main id="main-content" tabindex="-1" class="container section-pad narrow">
+  <section class="form-panel" aria-labelledby="profile-title">
+    <span class="eyebrow">YOUR SKILLLINK PROFILE</span>
+    <h1 id="profile-title">Edit your profile</h1>
+    <p class="text-secondary">Keep your details accurate so other members can work with confidence.</p>
+    <form method="post" enctype="multipart/form-data" novalidate>
+      {{ form.hidden_tag() }}
+      {% for field in [form.full_name, form.location] %}<div class="mb-3">{{ forms.field_control(field) }}</div>{% endfor %}
+      {% if role == 'freelancer' %}
+        {% for field in [form.headline, form.university, form.hourly_rate, form.skills, form.profile_image, form.bio] %}
+          <div class="mb-3">
+            {{ forms.field_control(field, rows=5 if field.name == 'bio' else None, accept='image/png,image/jpeg,image/webp' if field.name == 'profile_image' else None) }}
+            {% if field.name == 'skills' %}<p class="form-hint" id="skills-help">Separate skills with commas. For example: Python, UI design, Copywriting.</p>{% endif %}
+          </div>
+        {% endfor %}
+      {% elif role == 'client' %}
+        {% for field in [form.organization_name, form.website, form.bio, form.profile_image] %}
+          <div class="mb-3">{{ forms.field_control(field, rows=5 if field.name == 'bio' else None, accept='image/png,image/jpeg,image/webp' if field.name == 'profile_image' else None, label='Description' if field.name == 'bio' else None) }}</div>
+        {% endfor %}
+      {% endif %}
+      {{ form.submit(class_='btn btn-primary btn-lg') }}
+    </form>
+  </section>
+</main>
+{% endblock %}

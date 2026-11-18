@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% import 'macros/forms.html' as forms %}
+{% block title %}Post a job · SkillLink{% endblock %}
+{% block content %}
+<main id="main-content" tabindex="-1" class="container section-pad narrow">
+  <a class="back-link" href="{{ url_for('marketplace.jobs') }}">← Browse jobs</a>
+  <section class="form-panel mt-3" aria-labelledby="job-title">
+    <span class="eyebrow">HIRE EMERGING TALENT</span>
+    <h1 id="job-title">Post a job</h1>
+    <p class="text-secondary">Describe the work clearly so students can send relevant proposals.</p>
+    <form method="post" novalidate>
+      {{ form.hidden_tag() }}
+      {% for field in [form.title, form.category, form.description, form.budget_min, form.budget_max, form.location] %}
+        <div class="mb-3">{{ forms.field_control(field, rows=6 if field.name == 'description' else None, placeholder='Describe the project' if field.name == 'description' else None) }}</div>
+      {% endfor %}
+      {{ form.submit(class_='btn btn-primary btn-lg') }}
+    </form>
+  </section>
+</main>
+{% endblock %}

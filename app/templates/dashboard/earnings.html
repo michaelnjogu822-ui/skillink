@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }} · SkillLink{% endblock %}
+{% block content %}
+<main id="main-content" tabindex="-1" class="container section-pad">
+  <span class="eyebrow">PAYMENT RECORDS</span>
+  <h1>{{ title }}</h1>
+  <p class="text-secondary">{{ description }} Totals are grouped by currency.</p>
+  <div class="row g-3 mt-2 mb-5">
+    {% for currency, status, amount in totals %}
+    <div class="col-sm-6 col-lg-3"><div class="stat-card"><small>{{ currency }} · {{ status|title }}</small><strong>{{ '{:,.2f}'.format(amount) }}</strong></div></div>
+    {% else %}
+    <div class="col-12"><div class="empty-state"><p>No payment records yet. Project values are not counted as paid until a successful transaction is recorded.</p></div></div>
+    {% endfor %}
+  </div>
+  <div class="section-heading"><div><h2>Transaction history</h2><p class="text-secondary">Latest 100 payment records.</p></div></div>
+  <div class="row g-3">
+    {% for transaction in transactions %}
+    <div class="col-12"><article class="job-card d-flex flex-wrap justify-content-between gap-3 align-items-center">
+      <div><h3 class="h6 mb-1"><a href="{{ url_for('marketplace.project_detail', project_id=transaction.project_id) }}">{{ transaction.project.job.title }}</a></h3><small class="text-secondary">{{ transaction.provider|title }}{% if transaction.provider_reference %} · {{ transaction.provider_reference }}{% endif %} · {{ transaction.created_at.strftime('%d %b %Y') }}</small></div>
+      <div class="text-end"><strong>{{ transaction.currency }} {{ '{:,.2f}'.format(transaction.amount) }}</strong><div><span class="pill">{{ transaction.status|title }}</span></div></div>
+    </article></div>
+    {% else %}<div class="empty-state"><p>No transactions to show.</p></div>{% endfor %}
+  </div>
+</main>
+{% endblock %}

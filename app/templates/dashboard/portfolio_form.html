@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% import 'macros/forms.html' as forms %}
+{% block title %}Add portfolio project · SkillLink{% endblock %}
+{% block content %}
+<main id="main-content" tabindex="-1" class="container section-pad narrow">
+  <section class="form-panel" aria-labelledby="portfolio-title">
+    <span class="eyebrow">SHOW YOUR WORK</span>
+    <h1 id="portfolio-title">Add portfolio project</h1>
+    <p class="text-secondary">Share a project that demonstrates your skills.</p>
+    <form method="post" enctype="multipart/form-data" novalidate>
+      {{ form.hidden_tag() }}
+      {% for field in [form.title, form.description, form.project_url, form.image] %}
+        <div class="mb-3">{{ forms.field_control(field, rows=5 if field.name == 'description' else None, accept='image/png,image/jpeg,image/webp' if field.name == 'image' else None) }}</div>
+      {% endfor %}
+      {{ form.submit(class_='btn btn-primary') }}
+    </form>
+  </section>
+</main>
+{% endblock %}
