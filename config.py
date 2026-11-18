@@ -19,6 +19,16 @@ class Config:
     # Payment provider used by the escrow service. Only "simulated" ships with
     # the project; a real provider registers itself in app/services/escrow.py.
     PAYMENT_PROVIDER = os.environ.get("PAYMENT_PROVIDER", "simulated")
+    # Transactional email. "console" prints to the log, "smtp" sends for real,
+    # "memory" captures messages for tests.
+    MAIL_BACKEND = os.environ.get("MAIL_BACKEND", "console")
+    MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER", "SkillLink <no-reply@skilllink.local>")
+    MAIL_SERVER = os.environ.get("MAIL_SERVER")
+    MAIL_PORT = int(os.environ.get("MAIL_PORT", "587"))
+    MAIL_USERNAME = os.environ.get("MAIL_USERNAME")
+    MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD")
+    MAIL_USE_TLS = os.environ.get("MAIL_USE_TLS", "true").lower() == "true"
+    MAIL_TIMEOUT = int(os.environ.get("MAIL_TIMEOUT", "10"))
 
 
 class DevelopmentConfig(Config):

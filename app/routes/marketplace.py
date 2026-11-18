@@ -15,7 +15,7 @@ from app.extensions import db
 from app.forms import ApplicationForm, JobForm, MessageForm, ReviewForm
 from app.models import (FreelancerProfile, FreelancerSkill, Job, JobApplication,
                         Message, Notification, Project, Review, Skill, User)
-from app.services import escrow, messages as messages_service, notifications
+from app.services import email as email_service, escrow, messages as messages_service, notifications
 from app.services.escrow import PaymentError
 
 marketplace_bp = Blueprint("marketplace", __name__)
@@ -178,6 +178,12 @@ def apply_job(job_id):
         application = JobApplication(job_id=job.id, freelancer_id=current_user.id, cover_letter=form.cover_letter.data.strip(), proposed_rate=form.proposed_rate.data)
         db.session.add(application)
         notifications.notify(job.client_id, "job_application", actor=current_user.full_name, title=job.title, target_url=url_for("dashboard.applications"))
+        email_service.queue(
+            job.client, "application_received",
+            recipient_name=job.client.full_name,
+            freelancer_name=current_user.full_name,
+            job_title=job.title,
+        )
         try:
             db.session.commit()
         except IntegrityError:
@@ -240,6 +246,16 @@ def hire_application(application_id):
     project = Project(job_id=job.id, client_id=current_user.id, freelancer_id=application.freelancer_id, agreed_amount=amount)
     db.session.add(project)
     notifications.notify(application.freelancer_id, "hired", title=job.title, target_url=url_for("dashboard.projects"))
+    db.session.flush()
+    email_service.queue(
+        application.freelancer, "hired",
+        recipient_name=application.freelancer.full_name,
+        client_name=current_user.full_name,
+        job_title=job.title,
+        currency=project.currency,
+        amount=f"{amount:,.2f}",
+        project_id=project.id,
+    )
     try:
         db.session.commit()
     except IntegrityError:
@@ -386,6 +402,13 @@ def cancel_project(project_id):
     project.status = "cancelled"
     project.job.status = "cancelled"
     notifications.notify(project.freelancer_id, "project_cancelled", title=project.job.title, target_url=url_for("dashboard.projects"))
+    email_service.queue(
+        project.freelancer, "project_cancelled",
+        recipient_name=project.freelancer.full_name,
+        client_name=current_user.full_name,
+        job_title=project.job.title,
+        refunded=refunded,
+    )
     db.session.commit()
     message = "Project cancelled."
     if refunded:
@@ -417,6 +440,15 @@ def complete_project(project_id):
     project.completed_at = datetime.now(timezone.utc)
     project.job.status = "completed"
     notifications.notify(project.freelancer_id, "project_completed", title=project.job.title, target_url=url_for("marketplace.project_detail", project_id=project.id))
+    email_service.queue(
+        project.freelancer, "work_approved",
+        recipient_name=project.freelancer.full_name,
+        client_name=current_user.full_name,
+        job_title=project.job.title,
+        currency=project.currency,
+        amount=f"{project.agreed_amount:,.2f}",
+        project_id=project.id,
+    )
     db.session.commit()
     flash("Project marked complete. The escrow payment was released to the freelancer.", "success")
     return redirect(url_for("marketplace.project_detail", project_id=project.id))

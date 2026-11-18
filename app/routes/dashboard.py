@@ -254,7 +254,11 @@ def projects():
 def notification_settings():
     if request.method == "POST":
         for category in notifications_service.CATEGORIES:
-            notifications_service.set_preference(current_user.id, category, category in request.form)
+            for channel in notifications_service.CHANNELS:
+                field = f"{channel}_{category}"
+                notifications_service.set_preference(
+                    current_user.id, category, field in request.form, channel=channel)
+                
         db.session.commit()
         flash("Notification preferences saved.", "success")
         return redirect(url_for("dashboard.notification_settings"))

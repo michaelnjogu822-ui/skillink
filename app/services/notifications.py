@@ -24,6 +24,7 @@ from app.extensions import db
 from app.models import Notification, NotificationPreference
 
 CATEGORIES = NotificationPreference.CATEGORIES
+CHANNELS = NotificationPreference.CHANNELS
 
 CATEGORY_LABELS = {
     "applications": "Applications and hiring",
@@ -77,10 +78,14 @@ def format_message(kind: str, **details) -> str:
     return template.format(**details)
 
 
-def is_enabled(user_id: int, category: str) -> bool:
+def is_enabled(user_id: int, category: str, channel: str = "in_app") -> bool:
     """A missing row means enabled, so new accounts need no setup."""
+    if channel not in NotificationPreference.CHANNELS:
+        raise ValueError(f"Unknown notification channel: {channel!r}")
     preference = db.session.get(NotificationPreference, (user_id, category))
-    return True if preference is None else preference.enabled
+    if preference is None:
+        return True
+    return preference.enabled if channel == "in_app" else preference.email_enabled
 
 
 def notify(user_id: int, kind: str, *, target_url: str | None = None, **details) -> Notification | None:
@@ -102,20 +107,30 @@ def notify(user_id: int, kind: str, *, target_url: str | None = None, **details)
     return notification
 
 
-def set_preference(user_id: int, category: str, enabled: bool) -> NotificationPreference:
-    """Create or update one switch."""
+def set_preference(user_id: int, category: str, enabled: bool, channel: str = "in_app") -> NotificationPreference:
+    """Create or update one switch for one channel."""
     if category not in CATEGORIES:
         raise ValueError(f"Unknown notification category: {category!r}")
+    if channel not in NotificationPreference.CHANNELS:
+        raise ValueError(f"Unknown notification channel: {channel!r}")
     preference = db.session.get(NotificationPreference, (user_id, category))
     if preference is None:
-        preference = NotificationPreference(user_id=user_id, category=category, enabled=enabled)
+        preference = NotificationPreference(user_id=user_id, category=category)
         db.session.add(preference)
-    else:
+    if channel == "in_app":
         preference.enabled = enabled
+    else:
+        preference.email_enabled = enabled
     return preference
 
 
-def preferences_for(user_id: int) -> dict[str, bool]:
-    """Every category with its effective value, ready for the settings form."""
-    rows = {row.category: row.enabled for row in NotificationPreference.query.filter_by(user_id=user_id).all()}
-    return {category: rows.get(category, True) for category in CATEGORIES}
+def preferences_for(user_id: int) -> dict[str, dict[str, bool]]:
+    """Every category with its effective value per channel, for the settings form."""
+    rows = {row.category: row for row in NotificationPreference.query.filter_by(user_id=user_id).all()}
+    return {
+        category: {
+            "in_app": True if category not in rows else rows[category].enabled,
+            "email": True if category not in rows else rows[category].email_enabled,
+        }
+        for category in CATEGORIES
+    }

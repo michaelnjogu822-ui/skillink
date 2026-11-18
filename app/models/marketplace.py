@@ -206,23 +206,53 @@ class Notification(TimestampMixin, db.Model):
 
 
 class NotificationPreference(db.Model):
-    """Per-user switch for a category of in-app notification.
+    """Per-user switches for a notification category.
 
-    A missing row means the category is enabled, so a new account receives
-    notifications without any setup.
+    ``enabled`` controls in-app notifications and ``email_enabled`` controls the
+    email copy. Both default to true and a missing row means both are enabled,
+    so a new account needs no setup.
     """
 
     __tablename__ = "notification_preferences"
     CATEGORIES = ("applications", "projects", "messages", "payments", "reviews")
+    CHANNELS = ("in_app", "email")
     user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     category = db.Column(db.String(20), primary_key=True)
     enabled = db.Column(db.Boolean, nullable=False, default=True)
+    email_enabled = db.Column(db.Boolean, nullable=False, default=True, server_default="1")
     user = db.relationship("User")
     __table_args__ = (
         db.CheckConstraint(
             "category IN ('applications', 'projects', 'messages', 'payments', 'reviews')",
             name="ck_notification_preferences_category",
         ),
+    )
+
+
+class EmailOutbox(TimestampMixin, db.Model):
+    """An email waiting to be delivered, or the record of one already sent.
+
+    The body is rendered when the email is queued, so a retry never depends on
+    the state of the database or of a template at retry time. Delivery failures
+    are kept on the row (attempts, last_error) and retried by ``flask
+    send-emails`` or by the next request that queues mail.
+    """
+
+    __tablename__ = "email_outbox"
+    STATUSES = ("pending", "sent", "failed")
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    recipient = db.Column(db.String(255), nullable=False)
+    subject = db.Column(db.String(200), nullable=False)
+    body = db.Column(db.Text, nullable=False)
+    status = db.Column(db.String(20), nullable=False, default="pending", index=True)
+    attempts = db.Column(db.Integer, nullable=False, default=0)
+    last_error = db.Column(db.String(500))
+    sent_at = db.Column(db.DateTime(timezone=True))
+    user = db.relationship("User")
+    __table_args__ = (
+        db.CheckConstraint("status IN ('pending', 'sent', 'failed')", name="ck_email_outbox_status"),
+        db.CheckConstraint("attempts >= 0", name="ck_email_outbox_attempts_nonnegative"),
     )
 
 

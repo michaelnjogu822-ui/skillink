@@ -1,0 +1,11 @@
+Hello {{ recipient_name }},
+
+{{ freelancer_name }} has applied for your job "{{ job_title }}".
+
+Open your applications page to read the cover letter, compare applicants and hire:
+
+{{ url_for('dashboard.applications', _external=True) }}
+
+You can turn this email off in Notification settings: {{ url_for('dashboard.notification_settings', _external=True) }}
+
+SkillLink

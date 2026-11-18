@@ -1,0 +1,13 @@
+Hello {{ recipient_name }},
+
+{{ client_name }} cancelled the project "{{ job_title }}".
+
+{% if refunded %}The amount held in escrow has been refunded to the client, so there is nothing further to deliver for this project.{% else %}No payment had been funded for this project, so there is no money to refund.{% endif %}
+
+You can see your other projects here:
+
+{{ url_for('dashboard.projects', _external=True) }}
+
+You can turn this email off in Notification settings: {{ url_for('dashboard.notification_settings', _external=True) }}
+
+SkillLink

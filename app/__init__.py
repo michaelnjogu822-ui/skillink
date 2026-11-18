@@ -103,6 +103,27 @@ def create_app(config_object=None, config_overrides=None):
             raise click.ClickException("An account with that email address was just created.") from exc
         click.echo(f"Administrator created: {user.email}")
 
+    @app.cli.command("send-emails")
+    @click.option("--limit", default=50, show_default=True, help="Maximum messages to attempt.")
+    @click.option("--retry-failed", is_flag=True, help="Also retry messages that failed previously.")
+    @with_appcontext
+    def send_emails(limit, retry_failed):
+        """Deliver queued email, optionally retrying earlier failures."""
+        from app.services import email as email_service
+        sent, failed = email_service.flush(limit=limit, include_failed=retry_failed)
+        click.echo(f"Email delivery: {sent} sent, {failed} failed or deferred.")
+
+    @app.after_request
+    def deliver_queued_email(response):
+        """Send mail queued by a successful state change, after its transaction commits."""
+        if request.method != "GET" and response.status_code < 400:
+            from app.services import email as email_service
+            try:
+                email_service.flush()
+            except Exception:
+                app.logger.exception("Queued email delivery failed; run 'flask send-emails' to retry.")
+        return response
+
     @app.get("/health")
     def health():
         try:

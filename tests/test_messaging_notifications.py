@@ -154,7 +154,7 @@ class NotificationPreferenceTests(ConversationTestCase):
         self.assertEqual(page.status_code, 200)
         with self.app.app_context():
             values = notifications.preferences_for(self.client_id)
-        self.assertEqual(set(values.values()), {True})
+        self.assertEqual({flag for channels in values.values() for flag in channels.values()}, {True})
         self.assertIn(b'checked', page.data)
 
     def test_preferences_require_login(self):
@@ -162,16 +162,20 @@ class NotificationPreferenceTests(ConversationTestCase):
         self.assertEqual(anonymous.status_code, 302)
 
     def test_saving_preferences_persists_switches(self):
-        response = self.client.post("/settings/notifications", data={"messages": "on", "payments": "on"},
-                                    follow_redirects=True)
+        response = self.client.post("/settings/notifications", data={
+            "in_app_messages": "on", "email_messages": "on", "in_app_payments": "on"},
+            follow_redirects=True)
         self.assertEqual(response.status_code, 200)
         with self.app.app_context():
-            rows = {row.category: row.enabled for row in
+            rows = {row.category: row for row in
                     NotificationPreference.query.filter_by(user_id=self.client_id).all()}
-        self.assertTrue(rows["messages"])
-        self.assertTrue(rows["payments"])
-        self.assertFalse(rows["projects"])
-        self.assertFalse(rows["reviews"])
+        self.assertTrue(rows["messages"].enabled)
+        self.assertTrue(rows["messages"].email_enabled)
+        self.assertTrue(rows["payments"].enabled)
+        self.assertFalse(rows["payments"].email_enabled)
+        self.assertFalse(rows["projects"].enabled)
+        self.assertFalse(rows["projects"].email_enabled)
+        self.assertFalse(rows["reviews"].enabled)
 
     def test_muted_category_stops_the_notification_but_not_the_message(self):
         self.client.post("/settings/notifications", data={}, follow_redirects=True)

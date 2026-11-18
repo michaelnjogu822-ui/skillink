@@ -81,15 +81,32 @@ Acceptance criteria - met:
   application or payment.
 - Notification text is produced by one formatter and covered by tests.
 
-## Phase 4 - Email notifications (optional)  (NEXT)
+## Phase 4 - Email notifications  (COMPLETE)
 
 **Goal:** reach users when they are offline.
 
-Scope: a transactional email service behind an interface, templates for "application received",
-"you were hired", and "work approved", plus an outbox for retries. Local development writes to a
-console backend instead of sending mail.
+Delivered:
 
-## Phase 5 - Deployment and operations
+- `app/services/email.py`: event registry, three backends (console, memory, SMTP) behind an
+  `EmailBackend` interface, and `queue` / `flush` helpers.
+- An `email_outbox` table (migration `e5a7c9b1f302`) so an email is a durable row, not a call that
+  can be lost. Delivery failures stay on the row with attempts and the last error.
+- Four email events: an application received (to the client), being hired, work approved, and
+  cancellation with or without a refund (to the freelancer), each rendered from a text template.
+- Email switches per notification category (`notification_preferences.email_enabled`), independent
+  of the in-app switches, editable on the same settings page.
+- A `flask send-emails` command with `--retry-failed` for retries, and automatic delivery after a
+  successful state-changing request.
+- 12 new tests in `tests/test_email_notifications.py`; the suite is 74 tests.
+
+Acceptance criteria - met:
+
+- Applying, hiring, approving and cancelling queue the right email to the right person.
+- A delivery failure is recorded and retried later without failing the business action.
+- Turning email off for a category stops that email only; the in-app notification still appears.
+- A message is not retried beyond `MAX_ATTEMPTS`.
+
+## Phase 5 - Deployment and operations  (NEXT)
 
 **Goal:** the project runs on the internet safely.
 
@@ -100,7 +117,15 @@ aggregation, and a documented release checklist.
 Acceptance criteria: a staging deployment passes a smoke test; the production config refuses weak
 secrets; uploads survive a redeploy (object storage or persistent volume).
 
-## Phase 6 - Optional enhancements
+## Phase 6 - Security hardening and threat model  (APPROVED)
+
+**Goal:** defend the application against the threats a public marketplace attracts.
+
+Scope: an application-layer firewall (per-address rate limits, scanner path blocking, trusted
+proxy handling, request size and content-type checks), tightened security headers, and a written
+threat model mapping the OWASP Top 10 to the controls implemented here, each with a test.
+
+## Phase 7 - Optional enhancements
 
 - Skill-based job recommendations with an explainable score.
 - Saved searches with alerts.

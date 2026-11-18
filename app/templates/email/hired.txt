@@ -1,0 +1,13 @@
+Hello {{ recipient_name }},
+
+Good news: {{ client_name }} hired you for "{{ job_title }}".
+
+Agreed amount: {{ currency }} {{ amount }}
+
+The client funds the agreed amount into escrow, and it is released to you when the work is approved. Open the project to start the conversation:
+
+{{ url_for('marketplace.project_detail', project_id=project_id, _external=True) }}
+
+You can turn this email off in Notification settings: {{ url_for('dashboard.notification_settings', _external=True) }}
+
+SkillLink

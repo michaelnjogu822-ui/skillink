@@ -178,7 +178,35 @@ Switches live at `/settings/notifications`. A missing preference row means "enab
 accounts need no setup. Preferences govern notifications only: muting a category still records
 the message, application or payment itself.
 
-## 8. Security model
+## 8. Transactional email
+
+Email is queued, never sent inline by a business action:
+
+1. A route changes state and calls `email.queue(user, event, **facts)` in the same transaction.
+2. The service checks the recipient's email preference for the event's category and renders the
+   subject and body **now**, so a retry never depends on a template or a related row.
+3. A row is written to `email_outbox` with status `pending`.
+4. After a successful non-GET request commits, `flush()` hands the queue to the configured
+   backend. A failure is recorded on the row (`attempts`, `last_error`) and never fails the
+   business action.
+5. `flask send-emails` (optionally `--retry-failed`) retries later; after `MAX_ATTEMPTS` the row
+   is left failed with an explanatory error.
+
+| Event | Recipient | Category |
+|---|---|---|
+| `application_received` | client | applications |
+| `hired` | freelancer | applications |
+| `work_approved` | freelancer | projects |
+| `project_cancelled` | freelancer | projects |
+
+Backends are selected by `MAIL_BACKEND`: `console` (default in development, writes to the log),
+`memory` (tests capture messages) and `smtp` (real delivery through `MAIL_*` settings). A hosted
+provider such as Mailgun or SES is one more class implementing `EmailBackend.send`.
+
+Notification preferences have two switches per category: `enabled` for in-app and
+`email_enabled` for email. They are independent, so a user can keep the bell but drop the inbox.
+
+## 9. Security model
 
 | Threat | Control |
 |---|---|
@@ -195,6 +223,7 @@ the message, application or payment itself.
 | Suspended accounts | `load_user` returns `None` for inactive users, and admin suspension clears their sessions |
 | Production misconfiguration | The app refuses to boot in production without a strong `SECRET_KEY`, a server database, and secure cookies |
 | Message privacy | The feed and read endpoints check project membership on every request, and an outsider receives 403 |
+| Email abuse | Only fixed events render fixed templates and the recipient always comes from the user row, so a request cannot choose a template, a body or an address |
 | Notification spam | Per-category preferences are checked in one central writer, and a muted category silently skips the row |
 | Payment tampering | Amounts come from the project row, transitions are checked by the service and by database CHECK constraints, and every state change runs under a row lock |
 
@@ -208,7 +237,7 @@ Limitations to state honestly in a defence:
 - Escrow is simulated. A live provider must add authorisation, callbacks, reconciliation and
   refund handling; the interface is ready for it but the provider is not.
 
-## 9. Configuration
+## 10. Configuration
 
 Configuration comes from environment variables, loaded by `run.py` through `python-dotenv`.
 
@@ -223,7 +252,7 @@ Configuration comes from environment variables, loaded by `run.py` through `pyth
 | `LOGIN_WINDOW_SECONDS` | Length of that window in seconds (default 300). |
 | `PAYMENT_PROVIDER` | Provider used for escrow (default `simulated`). |
 
-## 10. Running and testing
+## 11. Running and testing
 
 ```powershell
 py -m venv .venv
@@ -241,6 +270,7 @@ python -m unittest discover -v        # full suite
 python -m unittest tests.test_login_security -v   # one module
 python -m unittest tests.test_escrow_payments -v   # escrow lifecycle
 python -m unittest tests.test_messaging_notifications -v   # polling + preferences
+python -m unittest tests.test_email_notifications -v   # outbox + delivery
 ```
 
 The suite builds its own application with an in-memory SQLite database, so it never touches

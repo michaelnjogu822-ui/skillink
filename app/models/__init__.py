@@ -1,6 +1,7 @@
 """SQLAlchemy models for SkillLink."""
 from app.models.marketplace import (
     ClientProfile,
+    EmailOutbox,
     FreelancerProfile,
     FreelancerSkill,
     Job,
@@ -20,5 +21,5 @@ from app.models.marketplace import (
 __all__ = [
     "User", "FreelancerProfile", "ClientProfile", "Skill", "FreelancerSkill",
     "Portfolio", "Job", "JobApplication", "Project", "Message",
-    "Notification", "NotificationPreference", "Review", "Transaction", "Report",
+    "Notification", "NotificationPreference", "EmailOutbox", "Review", "Transaction", "Report",
 ]

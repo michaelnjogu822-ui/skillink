@@ -1,0 +1,13 @@
+Hello {{ recipient_name }},
+
+{{ client_name }} approved the work you submitted for "{{ job_title }}", and the escrow payment was released to you.
+
+Released amount: {{ currency }} {{ amount }}
+
+The project is complete, so you can both leave a review:
+
+{{ url_for('marketplace.project_detail', project_id=project_id, _external=True) }}
+
+You can turn this email off in Notification settings: {{ url_for('dashboard.notification_settings', _external=True) }}
+
+SkillLink
