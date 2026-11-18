@@ -31,7 +31,19 @@ def create_app(config_object=None, config_overrides=None):
         if not app.config.get("SESSION_COOKIE_SECURE"):
             raise RuntimeError("Production requires SESSION_COOKIE_SECURE=true and HTTPS.")
     os.makedirs(app.instance_path, exist_ok=True)
-    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+    upload_folder = app.config.get("UPLOAD_FOLDER") or ""
+    if not upload_folder:
+        upload_folder = os.path.join(app.instance_path, "uploads")
+    elif not os.path.isabs(upload_folder):
+        upload_folder = os.path.abspath(upload_folder)
+    app.config["UPLOAD_FOLDER"] = upload_folder
+    os.makedirs(upload_folder, exist_ok=True)
+
+    from app.security import LoginThrottle
+    app.extensions["login_throttle"] = LoginThrottle(
+        max_failures=app.config.get("LOGIN_MAX_FAILURES", 5),
+        window_seconds=app.config.get("LOGIN_WINDOW_SECONDS", 300),
+    )
 
     db.init_app(app)
     migrate.init_app(app, db)

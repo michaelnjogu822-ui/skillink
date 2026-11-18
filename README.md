@@ -11,6 +11,9 @@ SkillLink is a student skills and freelancing marketplace for university and col
 - `app/forms.py` validates user input and protects form submissions with CSRF tokens.
 - `app/templates/` and `app/static/` contain the responsive Bootstrap interface and custom styles.
 - `migrations/` stores the Alembic history; use migrations when changing database structure.
+- `app/security.py` holds sign-in hardening: failed-attempt lockout and timing equalisation.
+- `docs/architecture.md` explains the stack, request lifecycle, data relationships and security model; `docs/roadmap.md` tracks the phases of work.
+- `.github/workflows/tests.yml` runs the test suite on every push and pull request.
 
 The data model centers on `users`, with separate one-to-one freelancer and client profiles. Freelancer skills are linked through `freelancer_skills`, which stores proficiency. Clients own jobs; freelancers submit one application per job; a hired job creates one project. Messages, reviews and transaction records attach to projects. Notifications and moderation reports reference users.
 
@@ -26,7 +29,7 @@ pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
 
-Set a long random `SECRET_KEY` in `.env`. To use MySQL, create a database and user, then set `DATABASE_URL` in `.env`, for example:
+Set a long random `SECRET_KEY` in `.env`. `LOGIN_MAX_FAILURES` and `LOGIN_WINDOW_SECONDS` control the sign-in lockout (defaults: 5 failures in 300 seconds); `UPLOAD_FOLDER` defaults to `instance/uploads` beside the database. To use MySQL, create a database and user, then set `DATABASE_URL` in `.env`, for example:
 
 ```text
 DATABASE_URL=mysql+pymysql://skilllink_user:password@localhost:3306/skilllink?charset=utf8mb4

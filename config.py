@@ -8,10 +8,14 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
     MAX_CONTENT_LENGTH = 5 * 1024 * 1024
-    UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", "instance/uploads")
+    # Empty means "use <instance>/uploads"; the app factory resolves it so the
+    # location does not depend on the directory the server was started from.
+    UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", "")
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
     SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "false").lower() == "true"
+    LOGIN_MAX_FAILURES = int(os.environ.get("LOGIN_MAX_FAILURES", "5"))
+    LOGIN_WINDOW_SECONDS = int(os.environ.get("LOGIN_WINDOW_SECONDS", "300"))
 
 
 class DevelopmentConfig(Config):
