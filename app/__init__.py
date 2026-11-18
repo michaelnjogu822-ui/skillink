@@ -30,7 +30,22 @@ def create_app(config_object=None, config_overrides=None):
             raise RuntimeError("Production requires DATABASE_URL for a supported server database; SQLite is for local development only.")
         if not app.config.get("SESSION_COOKIE_SECURE"):
             raise RuntimeError("Production requires SESSION_COOKIE_SECURE=true and HTTPS.")
+        mail_backend = app.config.get("MAIL_BACKEND", "console")
+        if mail_backend == "memory":
+            raise RuntimeError("Production cannot use the memory mail backend.")
+        if mail_backend == "smtp" and not (
+            app.config.get("MAIL_SERVER") and app.config.get("MAIL_DEFAULT_SENDER")
+        ):
+            raise RuntimeError("SMTP mail requires MAIL_SERVER and MAIL_DEFAULT_SENDER.")
+        if mail_backend == "console":
+            app.logger.warning(
+                "Production is using the console mail backend; queued email is written to the log, not delivered."
+            )
     os.makedirs(app.instance_path, exist_ok=True)
+    proxy_count = app.config.get("TRUSTED_PROXY_COUNT", 0)
+    if proxy_count:
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=proxy_count, x_proto=proxy_count, x_host=proxy_count)
     upload_folder = app.config.get("UPLOAD_FOLDER") or ""
     if not upload_folder:
         upload_folder = os.path.join(app.instance_path, "uploads")

@@ -22,3 +22,51 @@ jobs:
         env:
           SECRET_KEY: continuous-integration-secret-key-not-for-production
         run: python -m unittest discover -v
+
+  mysql-migrations:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: skilllink
+          MYSQL_USER: skilllink
+          MYSQL_PASSWORD: skilllink
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+
+      - name: Apply every migration to MySQL
+        env:
+          DATABASE_URL: mysql+pymysql://skilllink:skilllink@127.0.0.1:3306/skilllink?charset=utf8mb4
+          SECRET_KEY: continuous-integration-secret-key-not-for-production
+        run: python -m flask --app wsgi.py db upgrade
+
+      - name: Verify the schema is at head
+        env:
+          DATABASE_URL: mysql+pymysql://skilllink:skilllink@127.0.0.1:3306/skilllink?charset=utf8mb4
+          SECRET_KEY: continuous-integration-secret-key-not-for-production
+        run: python -m flask --app wsgi.py db current
+
+      - name: Roll back to an empty schema and migrate again
+        env:
+          DATABASE_URL: mysql+pymysql://skilllink:skilllink@127.0.0.1:3306/skilllink?charset=utf8mb4
+          SECRET_KEY: continuous-integration-secret-key-not-for-production
+        run: |
+          python -m flask --app wsgi.py db downgrade base
+          python -m flask --app wsgi.py db upgrade

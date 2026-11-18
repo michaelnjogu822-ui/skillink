@@ -7,3 +7,5 @@ PyMySQL>=1.1,<2.0
 python-dotenv>=1.0,<2.0
 email-validator>=2.0,<3.0
 WTForms>=3.3,<3.4
+gunicorn>=22,<24
+waitress>=3.0,<4.0

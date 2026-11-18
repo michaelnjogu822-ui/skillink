@@ -88,6 +88,8 @@ The tests use an isolated in-memory SQLite database and cover the client-to-free
 
 ## Payment and deployment notes
 
+In production the app runs under gunicorn (or waitress on Windows) behind HTTPS, backed by MySQL 8 and a least-privilege database user. [docs/deployment.md](docs/deployment.md) is the full checklist: MySQL setup, environment variables, the reverse proxy, backups, migration safety and a post-deploy smoke test.
+
 Escrow payments are simulated, not settled by a real provider. `app/services/escrow.py` implements the fund/release/refund lifecycle behind a `PaymentProvider` interface and ships with `SimulatedProvider`, which settles instantly and returns references like `SIM-DEP-1A2B3C4D5E6F`. Registering M-Pesa Daraja means implementing `charge`, `payout` and `refund` for that provider and setting `PAYMENT_PROVIDER`; no route or template changes. Real collection still requires Daraja credentials, callbacks and reconciliation. Production mode requires `SECRET_KEY`; configure a production database, HTTPS, secure cookies, backups and managed file storage before deployment. Email delivery defaults to the console backend; configure `MAIL_BACKEND=smtp` and the `MAIL_*` variables for real mail. True real-time messaging (WebSockets), AI recommendations and M-Pesa integration remain future extensions.
 
 ## License

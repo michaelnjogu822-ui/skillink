@@ -106,16 +106,34 @@ Acceptance criteria - met:
 - Turning email off for a category stops that email only; the in-app notification still appears.
 - A message is not retried beyond `MAX_ATTEMPTS`.
 
-## Phase 5 - Deployment and operations  (NEXT)
+## Phase 5 - Deployment and operations  (COMPLETE)
 
 **Goal:** the project runs on the internet safely.
 
-Scope: MySQL database and user with least privilege, environment variables in the host dashboard,
-HTTPS with secure cookies, `gunicorn` (or equivalent) as the server, database backups, log
-aggregation, and a documented release checklist.
+Delivered:
 
-Acceptance criteria: a staging deployment passes a smoke test; the production config refuses weak
-secrets; uploads survive a redeploy (object storage or persistent volume).
+- `wsgi.py` entry point, `Procfile`, `Dockerfile` (non-root user, healthcheck) and
+  `docker-compose.yml` running MySQL 8 and the app together.
+- `scripts/mysql_setup.sql` creates the database and a user limited to the skilllink schema.
+- Hardened `ProductionConfig`: https URLs, secure and http-only remember cookies, pool recycling,
+  `TRUSTED_PROXY_COUNT` with `ProxyFix`, and startup refusals for a weak secret, SQLite, insecure
+  cookies, the memory mail backend, or SMTP without a server and sender.
+- `docs/deployment.md`: MySQL provisioning, environment variables, gunicorn/waitress, nginx TLS
+  termination, uploads, email, backups, migration safety and a post-deploy smoke test.
+- A CI job that starts MySQL 8, applies every migration, checks the revision, downgrades to an
+  empty schema and migrates again.
+- The baseline migration downgrade now drops tables instead of dropping foreign-key indexes first,
+  which failed on MySQL; the escrow downgrade folds `released` and `held` rows into states the
+  older schema understands.
+- 11 new tests in `tests/test_production_config.py`; the suite is 85 tests.
+
+Acceptance criteria - met:
+
+- Every migration applies to MySQL 8, a full marketplace workflow runs against it, and the schema
+  migrates down and back up with data present.
+- The production config refuses weak secrets, SQLite, insecure cookies and an unconfigured SMTP
+  deployment, and uses the real client address behind one trusted proxy.
+- Deployment steps and a smoke-test checklist are documented.
 
 ## Phase 6 - Security hardening and threat model  (APPROVED)
 

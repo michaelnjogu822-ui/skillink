@@ -1,0 +1,47 @@
+# Production-like stack: SkillLink + MySQL 8.
+#
+#   docker compose up --build
+#   docker compose exec web flask db upgrade
+#   docker compose exec web flask create-admin you@example.com "Your Name"
+#
+# Open http://127.0.0.1:8000 (set SESSION_COOKIE_SECURE=false for plain-HTTP local use).
+services:
+  db:
+    image: mysql:8.0
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root-local-only}
+      MYSQL_DATABASE: skilllink
+      MYSQL_USER: skilllink
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-skilllink-local-only}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root-local-only}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  web:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP_ENV: production
+      SECRET_KEY: ${SECRET_KEY:-change-me-to-a-32-character-secret}
+      DATABASE_URL: mysql+pymysql://skilllink:${MYSQL_PASSWORD:-skilllink-local-only}@db:3306/skilllink?charset=utf8mb4
+      SESSION_COOKIE_SECURE: "false"
+      TRUSTED_PROXY_COUNT: "0"
+      MAIL_BACKEND: console
+      MAIL_DEFAULT_SENDER: "SkillLink <no-reply@skilllink.local>"
+    ports:
+      - "8000:8000"
+    volumes:
+      - uploads:/app/instance/uploads
+
+volumes:
+  mysql-data:
+  uploads:

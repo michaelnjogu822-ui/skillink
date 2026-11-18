@@ -29,6 +29,13 @@ def upgrade():
 
 
 def downgrade():
+    # The previous schema has no escrow concept, so rows using the new
+    # statuses must be folded into states it understands before the narrower
+    # CHECK constraint is restored: money already released stays recorded as a
+    # successful payment, and money still held is recorded as a failed
+    # transaction rather than pretending it was paid.
+    op.execute("UPDATE transactions SET status = 'succeeded' WHERE status = 'released'")
+    op.execute("UPDATE transactions SET status = 'failed' WHERE status = 'held'")
     with op.batch_alter_table("transactions") as batch_op:
         batch_op.drop_index(batch_op.f("ix_transactions_settlement_reference"))
         batch_op.drop_index(batch_op.f("ix_transactions_kind"))

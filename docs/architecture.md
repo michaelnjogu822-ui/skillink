@@ -231,8 +231,8 @@ Limitations to state honestly in a defence:
 
 - The login throttle is in process memory, so several worker processes each keep their own
   counters. A production deployment should move this to Redis or a database table.
-- `request.remote_addr` is the direct client. Behind a proxy, configure trusted proxies so
-  the real address is used.
+- `request.remote_addr` is the direct client unless `TRUSTED_PROXY_COUNT` is set. A proxy
+  deployment must set it, or the rate limiter sees one address for every user.
 - File uploads are stored on local disk. Production should use object storage.
 - Escrow is simulated. A live provider must add authorisation, callbacks, reconciliation and
   refund handling; the interface is ready for it but the provider is not.
@@ -251,6 +251,11 @@ Configuration comes from environment variables, loaded by `run.py` through `pyth
 | `LOGIN_MAX_FAILURES` | Failed sign-ins allowed per email and client address (default 5). |
 | `LOGIN_WINDOW_SECONDS` | Length of that window in seconds (default 300). |
 | `PAYMENT_PROVIDER` | Provider used for escrow (default `simulated`). |
+| `MAIL_BACKEND` | `console` (default), `memory` or `smtp`. |
+| `MAIL_DEFAULT_SENDER` | From address for outgoing mail (required by SMTP). |
+| `MAIL_SERVER`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_USE_TLS` | SMTP connection settings. |
+| `TRUSTED_PROXY_COUNT` | Reverse proxies in front of the app; enables `ProxyFix` for the forwarded client address and scheme. |
+| `SERVER_NAME` | Public hostname for links generated outside a request. |
 
 ## 11. Running and testing
 

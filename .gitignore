@@ -7,3 +7,5 @@ instance/
 migrations/versions/__pycache__/
 .pytest_cache/
 .test-tmp/
+.mysql-data/
+.mysql-run/
