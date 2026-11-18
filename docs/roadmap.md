@@ -51,16 +51,37 @@ Acceptance criteria - met:
 - Ledger amounts always equal the project's agreed amount.
 - Illegal statuses are rejected by the database, not only by Python.
 
-## Phase 3 - Messaging and notifications  (NEXT)
+## Phase 3 - Messaging and notifications  (COMPLETE)
 
 **Goal:** conversations that feel instant without a second technology stack.
 
-Scope: message polling endpoint with incremental reads, unread badges kept accurate,
-notification preferences, and a single place that formats in-app notification text.
+Delivered:
 
-Acceptance criteria: participants only; read receipts update; no duplicate notifications on refresh.
+- An incremental message feed, `GET /projects/<id>/messages.json?since_id=`, that returns only
+  new messages plus the viewer's unread count, and `POST /projects/<id>/messages/read` to mark
+  the conversation read. Both check project membership on every request.
+- `static/js/messages.js` polls every five seconds while the project page is visible, appends
+  new messages, marks them read and keeps the navigation badge accurate.
+- One source for unread counts (`app/services/messages.py`) shared by the badge, the inbox and
+  the polling endpoint.
+- One writer for notifications (`app/services/notifications.py`): every call site now passes a
+  kind and facts instead of hand-built text, so wording lives in a single table and a muted
+  category can skip the row.
+- Per-user notification preferences at `/settings/notifications` across applications, projects,
+  messages, payments and reviews, stored in the new `notification_preferences` table
+  (migration `d94b2f7c1a08`).
+- 16 new tests in `tests/test_messaging_notifications.py`; the suite is 62 tests.
 
-## Phase 4 - Email notifications (optional)
+Acceptance criteria - met:
+
+- Only the project's participants (and administrators, read-only) can read the feed; outsiders
+  receive 403 and anonymous visitors are redirected to sign in.
+- The feed returns only messages after `since_id`, and the read marker clears the unread count.
+- Muting a category suppresses its notification without suppressing the underlying message,
+  application or payment.
+- Notification text is produced by one formatter and covered by tests.
+
+## Phase 4 - Email notifications (optional)  (NEXT)
 
 **Goal:** reach users when they are offline.
 

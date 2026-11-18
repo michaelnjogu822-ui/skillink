@@ -7,6 +7,7 @@ from app.models.marketplace import (
     JobApplication,
     Message,
     Notification,
+    NotificationPreference,
     Portfolio,
     Project,
     Report,
@@ -19,5 +20,5 @@ from app.models.marketplace import (
 __all__ = [
     "User", "FreelancerProfile", "ClientProfile", "Skill", "FreelancerSkill",
     "Portfolio", "Job", "JobApplication", "Project", "Message",
-    "Notification", "Review", "Transaction", "Report",
+    "Notification", "NotificationPreference", "Review", "Transaction", "Report",
 ]

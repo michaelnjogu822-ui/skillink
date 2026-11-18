@@ -205,6 +205,27 @@ class Notification(TimestampMixin, db.Model):
     user = db.relationship("User")
 
 
+class NotificationPreference(db.Model):
+    """Per-user switch for a category of in-app notification.
+
+    A missing row means the category is enabled, so a new account receives
+    notifications without any setup.
+    """
+
+    __tablename__ = "notification_preferences"
+    CATEGORIES = ("applications", "projects", "messages", "payments", "reviews")
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    category = db.Column(db.String(20), primary_key=True)
+    enabled = db.Column(db.Boolean, nullable=False, default=True)
+    user = db.relationship("User")
+    __table_args__ = (
+        db.CheckConstraint(
+            "category IN ('applications', 'projects', 'messages', 'payments', 'reviews')",
+            name="ck_notification_preferences_category",
+        ),
+    )
+
+
 class Review(TimestampMixin, db.Model):
     __tablename__ = "reviews"
     id = db.Column(db.Integer, primary_key=True)

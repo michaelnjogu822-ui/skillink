@@ -66,17 +66,11 @@ def create_app(config_object=None, config_overrides=None):
         count = 0
         unread_message_count = 0
         if current_user.is_authenticated:
-            from app.models import Message, Notification, Project
-            unread_notifications = db.select(func.count(Notification.id)).where(
-                Notification.user_id == current_user.id, Notification.read_at.is_(None)
-            ).scalar_subquery()
-            unread_messages = db.select(func.count(Message.id)).join(
-                Project, Project.id == Message.project_id
-            ).where(
-                ((Project.client_id == current_user.id) | (Project.freelancer_id == current_user.id)),
-                Message.sender_id != current_user.id, Message.read_at.is_(None),
-            ).scalar_subquery()
-            count, unread_message_count = db.session.query(unread_notifications, unread_messages).one()
+            from app.models import Notification
+            from app.services.messages import unread_count
+
+            count = Notification.query.filter_by(user_id=current_user.id, read_at=None).count()
+            unread_message_count = unread_count(current_user.id)
         return {"unread_notification_count": count, "unread_message_count": unread_message_count}
 
     @app.cli.command("create-admin")

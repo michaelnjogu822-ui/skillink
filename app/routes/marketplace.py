@@ -4,7 +4,7 @@ from decimal import Decimal, InvalidOperation
 from functools import wraps
 import math
 
-from flask import (Blueprint, abort, flash, redirect, render_template, request,
+from flask import (Blueprint, abort, flash, jsonify, redirect, render_template, request,
                    url_for)
 from flask_login import current_user, login_required
 from sqlalchemy import or_
@@ -15,7 +15,7 @@ from app.extensions import db
 from app.forms import ApplicationForm, JobForm, MessageForm, ReviewForm
 from app.models import (FreelancerProfile, FreelancerSkill, Job, JobApplication,
                         Message, Notification, Project, Review, Skill, User)
-from app.services import escrow
+from app.services import escrow, messages as messages_service, notifications
 from app.services.escrow import PaymentError
 
 marketplace_bp = Blueprint("marketplace", __name__)
@@ -177,7 +177,7 @@ def apply_job(job_id):
     if form.validate_on_submit():
         application = JobApplication(job_id=job.id, freelancer_id=current_user.id, cover_letter=form.cover_letter.data.strip(), proposed_rate=form.proposed_rate.data)
         db.session.add(application)
-        db.session.add(Notification(user_id=job.client_id, kind="job_application", message=f"{current_user.full_name} applied for {job.title}.", target_url=url_for("dashboard.applications")))
+        notifications.notify(job.client_id, "job_application", actor=current_user.full_name, title=job.title, target_url=url_for("dashboard.applications"))
         try:
             db.session.commit()
         except IntegrityError:
@@ -204,7 +204,7 @@ def submit_project(project_id):
         abort(409)
     project.status = "submitted"
     project.submitted_at = datetime.now(timezone.utc)
-    db.session.add(Notification(user_id=project.client_id, kind="project_submitted", message=f"Work was submitted for {project.job.title}.", target_url=url_for("marketplace.project_detail", project_id=project.id)))
+    notifications.notify(project.client_id, "project_submitted", title=project.job.title, target_url=url_for("marketplace.project_detail", project_id=project.id))
     db.session.commit()
     flash("Work submitted for client review.", "success")
     return redirect(url_for("marketplace.project_detail", project_id=project.id))
@@ -239,7 +239,7 @@ def hire_application(application_id):
             other.status = "rejected"
     project = Project(job_id=job.id, client_id=current_user.id, freelancer_id=application.freelancer_id, agreed_amount=amount)
     db.session.add(project)
-    db.session.add(Notification(user_id=application.freelancer_id, kind="hired", message=f"You were hired for {job.title}.", target_url=url_for("dashboard.projects")))
+    notifications.notify(application.freelancer_id, "hired", title=job.title, target_url=url_for("dashboard.projects"))
     try:
         db.session.commit()
     except IntegrityError:
@@ -278,6 +278,50 @@ def project_detail(project_id):
                            escrow_labels=escrow.STATE_LABELS)
 
 
+@marketplace_bp.get("/projects/<int:project_id>/messages.json")
+@login_required
+def project_messages_feed(project_id):
+    """Incremental message feed used by the project page poller.
+
+    Returns only messages newer than ``since_id`` so the browser never re-renders
+    the whole conversation, plus the user's current global unread count so the
+    navigation badge stays accurate without a page reload.
+    """
+    project = db.get_or_404(Project, project_id)
+    if current_user.id not in (project.client_id, project.freelancer_id) and current_user.role != "admin":
+        abort(403)
+    since_id = request.args.get("since_id", default=0, type=int) or 0
+    messages = Message.query.options(joinedload(Message.sender)).filter(
+        Message.project_id == project.id, Message.id > since_id
+    ).order_by(Message.id.asc()).limit(100).all()
+    return jsonify({
+        "messages": [
+            {
+                "id": message.id,
+                "sender_id": message.sender_id,
+                "sender": message.sender.full_name,
+                "body": message.body,
+                "created_at": message.created_at.strftime("%d %b, %H:%M"),
+                "mine": message.sender_id == current_user.id,
+            }
+            for message in messages
+        ],
+        "latest_id": messages[-1].id if messages else since_id,
+        "unread_total": messages_service.unread_count(current_user.id),
+    })
+
+
+@marketplace_bp.post("/projects/<int:project_id>/messages/read")
+@login_required
+def mark_messages_read(project_id):
+    project = db.get_or_404(Project, project_id)
+    if current_user.id not in (project.client_id, project.freelancer_id):
+        abort(403)
+    messages_service.mark_project_read(project.id, current_user.id)
+    db.session.commit()
+    return jsonify({"ok": True, "unread_total": messages_service.unread_count(current_user.id)})
+
+
 @marketplace_bp.post("/projects/<int:project_id>/messages")
 @login_required
 def send_message(project_id):
@@ -289,7 +333,7 @@ def send_message(project_id):
         message = Message(project_id=project.id, sender_id=current_user.id, body=form.body.data.strip())
         db.session.add(message)
         recipient_id = project.freelancer_id if current_user.id == project.client_id else project.client_id
-        db.session.add(Notification(user_id=recipient_id, kind="message", message=f"New message about {project.job.title}.", target_url=url_for("marketplace.project_detail", project_id=project.id)))
+        notifications.notify(recipient_id, "message", actor=current_user.full_name, title=project.job.title, target_url=url_for("marketplace.project_detail", project_id=project.id) + "#messages")
         try:
             db.session.commit()
         except IntegrityError:
@@ -341,12 +385,7 @@ def cancel_project(project_id):
         return redirect(url_for("marketplace.project_detail", project_id=project.id))
     project.status = "cancelled"
     project.job.status = "cancelled"
-    db.session.add(Notification(
-        user_id=project.freelancer_id,
-        kind="project_cancelled",
-        message=f"{project.job.title} was cancelled by the client.",
-        target_url=url_for("dashboard.projects"),
-    ))
+    notifications.notify(project.freelancer_id, "project_cancelled", title=project.job.title, target_url=url_for("dashboard.projects"))
     db.session.commit()
     message = "Project cancelled."
     if refunded:
@@ -377,7 +416,7 @@ def complete_project(project_id):
     project.status = "completed"
     project.completed_at = datetime.now(timezone.utc)
     project.job.status = "completed"
-    db.session.add(Notification(user_id=project.freelancer_id, kind="project_completed", message=f"{project.job.title} was marked complete.", target_url=url_for("marketplace.project_detail", project_id=project.id)))
+    notifications.notify(project.freelancer_id, "project_completed", title=project.job.title, target_url=url_for("marketplace.project_detail", project_id=project.id))
     db.session.commit()
     flash("Project marked complete. The escrow payment was released to the freelancer.", "success")
     return redirect(url_for("marketplace.project_detail", project_id=project.id))
@@ -414,12 +453,7 @@ def review_project(project_id):
             if reviewee_id == project.freelancer_id
             else url_for("dashboard.profile")
         )
-        db.session.add(Notification(
-            user_id=reviewee_id,
-            kind="review_received",
-            message=f"{current_user.full_name} left you a {review.rating}-star review.",
-            target_url=review_target,
-        ))
+        notifications.notify(reviewee_id, "review_received", actor=current_user.full_name, rating=review.rating, target_url=review_target)
         try:
             db.session.commit()
         except IntegrityError:

@@ -138,7 +138,47 @@ Escrow rows are `kind = 'escrow'`; rows imported or recorded outside the flow ar
 `kind = 'manual'`. Freelancer earnings count `released` and legacy `succeeded` money, so
 funds sitting in escrow are visible but are never counted as earned.
 
-## 7. Security model
+## 7. Messaging and notifications
+
+### Project conversations
+
+Messages belong to a project and are visible to its two participants (administrators can
+read for moderation, but cannot post). The project page updates without a reload:
+
+- `GET /projects/<id>/messages.json?since_id=<n>` returns only messages newer than `since_id`,
+  each with the sender, body, timestamp and a `mine` flag, plus the viewer's global unread
+  count.
+- `POST /projects/<id>/messages/read` marks the counterpart's messages as read and returns the
+  new count.
+- `static/js/messages.js` polls every five seconds while the page is visible, appends new
+  bubbles, requests the read marker when a reply arrives, and updates the navigation badge.
+
+Polling was chosen over WebSockets deliberately: it needs no second process or message broker,
+runs on any host that can serve Flask, and is straightforward to test. The cost is up to five
+seconds of latency. A push channel would be an optimisation later, not a correctness fix.
+
+Unread counts come from one place, `app/services/messages.py`, used by the navigation badge,
+the inbox and the polling endpoint, so the three cannot disagree.
+
+### Notifications: one formatter, one preference check
+
+`app/services/notifications.py` is the only code that writes an in-app notification. Callers
+pass a kind and the facts; the service formats the text, checks the recipient's preference and
+writes the row (or returns `None` when the category is muted).
+
+| Category | Kinds |
+|---|---|
+| applications | `job_application`, `hired` |
+| projects | `project_submitted`, `project_completed`, `project_cancelled` |
+| messages | `message` |
+| payments | `escrow_funded`, `payment_released`, `payment_refunded` |
+| reviews | `review_received` |
+
+Switches live at `/settings/notifications`. A missing preference row means "enabled", so new
+accounts need no setup. Preferences govern notifications only: muting a category still records
+the message, application or payment itself.
+
+## 8. Security model
 
 | Threat | Control |
 |---|---|
@@ -154,6 +194,8 @@ funds sitting in escrow are visible but are never counted as earned.
 | Privilege escalation | Role checks on every admin route plus ownership checks (a client can only edit their own job) |
 | Suspended accounts | `load_user` returns `None` for inactive users, and admin suspension clears their sessions |
 | Production misconfiguration | The app refuses to boot in production without a strong `SECRET_KEY`, a server database, and secure cookies |
+| Message privacy | The feed and read endpoints check project membership on every request, and an outsider receives 403 |
+| Notification spam | Per-category preferences are checked in one central writer, and a muted category silently skips the row |
 | Payment tampering | Amounts come from the project row, transitions are checked by the service and by database CHECK constraints, and every state change runs under a row lock |
 
 Limitations to state honestly in a defence:
@@ -166,7 +208,7 @@ Limitations to state honestly in a defence:
 - Escrow is simulated. A live provider must add authorisation, callbacks, reconciliation and
   refund handling; the interface is ready for it but the provider is not.
 
-## 8. Configuration
+## 9. Configuration
 
 Configuration comes from environment variables, loaded by `run.py` through `python-dotenv`.
 
@@ -181,7 +223,7 @@ Configuration comes from environment variables, loaded by `run.py` through `pyth
 | `LOGIN_WINDOW_SECONDS` | Length of that window in seconds (default 300). |
 | `PAYMENT_PROVIDER` | Provider used for escrow (default `simulated`). |
 
-## 9. Running and testing
+## 10. Running and testing
 
 ```powershell
 py -m venv .venv
@@ -198,6 +240,7 @@ flask run
 python -m unittest discover -v        # full suite
 python -m unittest tests.test_login_security -v   # one module
 python -m unittest tests.test_escrow_payments -v   # escrow lifecycle
+python -m unittest tests.test_messaging_notifications -v   # polling + preferences
 ```
 
 The suite builds its own application with an in-memory SQLite database, so it never touches

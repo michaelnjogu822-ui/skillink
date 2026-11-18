@@ -4,7 +4,7 @@ from functools import wraps
 from pathlib import Path
 from uuid import uuid4
 
-from flask import Blueprint, abort, current_app, flash, redirect, render_template, url_for
+from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
@@ -13,6 +13,7 @@ from werkzeug.utils import secure_filename
 
 from app.extensions import db
 from app.forms import PortfolioForm, ProfileForm, ReportForm
+from app.services import notifications as notifications_service
 from app.models import (FreelancerSkill, Job, JobApplication, Message, Notification,
                         Portfolio, Project, Report, Skill, Transaction, User)
 
@@ -246,6 +247,22 @@ def projects():
     else:
         items = Project.query.options(*options).filter((Project.client_id == current_user.id) | (Project.freelancer_id == current_user.id)).order_by(Project.updated_at.desc()).limit(100).all()
     return render_template("dashboard/projects.html", projects=items)
+
+
+@dashboard_bp.route("/settings/notifications", methods=["GET", "POST"])
+@login_required
+def notification_settings():
+    if request.method == "POST":
+        for category in notifications_service.CATEGORIES:
+            notifications_service.set_preference(current_user.id, category, category in request.form)
+        db.session.commit()
+        flash("Notification preferences saved.", "success")
+        return redirect(url_for("dashboard.notification_settings"))
+    return render_template(
+        "dashboard/notification_settings.html",
+        preferences=notifications_service.preferences_for(current_user.id),
+        labels=notifications_service.CATEGORY_LABELS,
+    )
 
 
 @dashboard_bp.get("/notifications")

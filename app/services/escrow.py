@@ -24,7 +24,8 @@ from dataclasses import dataclass
 from flask import current_app, url_for
 
 from app.extensions import db
-from app.models import Notification, Project, Transaction
+from app.models import Project, Transaction
+from app.services import notifications
 
 
 class PaymentError(Exception):
@@ -132,12 +133,11 @@ def fund_project(project: Project, client, provider: PaymentProvider | None = No
         status="held",
     )
     db.session.add(transaction)
-    db.session.add(Notification(
-        user_id=project.freelancer_id,
-        kind="escrow_funded",
-        message=f"{project.currency} {project.agreed_amount:,.2f} is now held in escrow for {project.job.title}.",
+    notifications.notify(
+        project.freelancer_id, "escrow_funded", currency=project.currency,
+        amount=f"{project.agreed_amount:,.2f}", title=project.job.title,
         target_url=url_for("marketplace.project_detail", project_id=project.id),
-    ))
+    )
     return transaction
 
 
@@ -150,12 +150,11 @@ def release_escrow(project: Project, provider: PaymentProvider | None = None) ->
     receipt = provider.payout(project=project, transaction=transaction)
     transaction.status = "released"
     transaction.settlement_reference = receipt.reference
-    db.session.add(Notification(
-        user_id=project.freelancer_id,
-        kind="payment_released",
-        message=f"{project.currency} {transaction.amount:,.2f} was released to you for {project.job.title}.",
+    notifications.notify(
+        project.freelancer_id, "payment_released", currency=project.currency,
+        amount=f"{transaction.amount:,.2f}", title=project.job.title,
         target_url=url_for("dashboard.earnings"),
-    ))
+    )
     return transaction
 
 
@@ -168,10 +167,9 @@ def refund_escrow(project: Project, provider: PaymentProvider | None = None) -> 
     receipt = provider.refund(project=project, transaction=transaction)
     transaction.status = "refunded"
     transaction.settlement_reference = receipt.reference
-    db.session.add(Notification(
-        user_id=project.client_id,
-        kind="payment_refunded",
-        message=f"{project.currency} {transaction.amount:,.2f} was refunded for {project.job.title}.",
+    notifications.notify(
+        project.client_id, "payment_refunded", currency=project.currency,
+        amount=f"{transaction.amount:,.2f}", title=project.job.title,
         target_url=url_for("dashboard.earnings"),
-    ))
+    )
     return transaction
