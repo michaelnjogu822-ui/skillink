@@ -348,6 +348,23 @@ def earnings():
                            title=title, description=description)
 
 
+@dashboard_bp.get("/admin/security")
+@roles_required("admin")
+def admin_security():
+    log = current_app.extensions["firewall_log"]
+    settings = {
+        "enabled": current_app.config.get("FIREWALL_ENABLED", True),
+        "window": current_app.config["RATE_LIMIT_WINDOW_SECONDS"],
+        "global": current_app.config["RATE_LIMIT_GLOBAL"],
+        "write": current_app.config["RATE_LIMIT_WRITE"],
+        "auth": current_app.config["RATE_LIMIT_AUTH"],
+        "hosts": current_app.config.get("ALLOWED_HOSTS") or (),
+        "trusted_proxies": current_app.config.get("TRUSTED_PROXY_COUNT", 0),
+    }
+    return render_template("dashboard/admin_security.html", entries=log.entries(),
+                           counts=log.rule_counts(), settings=settings)
+
+
 @dashboard_bp.get("/admin/payments")
 @roles_required("admin")
 def admin_payments():

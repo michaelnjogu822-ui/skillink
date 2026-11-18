@@ -225,6 +225,9 @@ Notification preferences have two switches per category: `enabled` for in-app an
 | Message privacy | The feed and read endpoints check project membership on every request, and an outsider receives 403 |
 | Email abuse | Only fixed events render fixed templates and the recipient always comes from the user row, so a request cannot choose a template, a body or an address |
 | Notification spam | Per-category preferences are checked in one central writer, and a muted category silently skips the row |
+| Automated scanning and probing | The application firewall refuses known scanner paths with 404, records the attempt and shows it at `/admin/security` |
+| Request floods | Fixed-window limits per client address for all requests, writes and authentication, answering 429 with `Retry-After` |
+| Host header injection | `ALLOWED_HOSTS` refuses unknown hostnames when configured |
 | Payment tampering | Amounts come from the project row, transitions are checked by the service and by database CHECK constraints, and every state change runs under a row lock |
 
 Limitations to state honestly in a defence:
@@ -254,6 +257,9 @@ Configuration comes from environment variables, loaded by `run.py` through `pyth
 | `MAIL_BACKEND` | `console` (default), `memory` or `smtp`. |
 | `MAIL_DEFAULT_SENDER` | From address for outgoing mail (required by SMTP). |
 | `MAIL_SERVER`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_USE_TLS` | SMTP connection settings. |
+| `FIREWALL_ENABLED` | Turn the application firewall and rate limits on or off (default true). |
+| `RATE_LIMIT_WINDOW_SECONDS`, `RATE_LIMIT_GLOBAL`, `RATE_LIMIT_WRITE`, `RATE_LIMIT_AUTH` | Request budget per client address per window. |
+| `ALLOWED_HOSTS` | Comma-separated hostnames the app will answer for; empty accepts any host in development. |
 | `TRUSTED_PROXY_COUNT` | Reverse proxies in front of the app; enables `ProxyFix` for the forwarded client address and scheme. |
 | `SERVER_NAME` | Public hostname for links generated outside a request. |
 

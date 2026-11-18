@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block title %}Security · Administration · SkillLink{% endblock %}
+{% block content %}
+<main id="main-content" tabindex="-1" class="container section-pad">
+  <span class="eyebrow">ADMINISTRATION</span>
+  <h1>Request security</h1>
+  <p class="text-secondary">Requests refused by the application firewall, newest first. Entries are kept in memory per worker process, so this is a live view rather than a permanent audit log.</p>
+
+  <div class="row g-3 mt-2 mb-4">
+    <div class="col-sm-6 col-lg-3"><div class="stat-card"><small>Firewall</small><strong>{{ 'Enabled' if settings.enabled else 'Disabled' }}</strong></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="stat-card"><small>Rate window</small><strong>{{ settings.window }}s</strong></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="stat-card"><small>Requests / window</small><strong>{{ settings.global }}</strong><div class="small">write {{ settings.write }} · sign-in {{ settings.auth }}</div></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="stat-card"><small>Trusted proxies</small><strong>{{ settings.trusted_proxies }}</strong><div class="small">{{ settings.hosts|join(', ') if settings.hosts else 'Any host (development)' }}</div></div></div>
+  </div>
+
+  {% if counts %}
+  <div class="section-heading"><div><h2>Rejected by rule</h2></div></div>
+  <div class="row g-3 mb-4">
+    {% for rule, count in counts.items() %}
+    <div class="col-sm-6 col-lg-3"><div class="stat-card"><small>{{ rule }}</small><strong>{{ count }}</strong></div></div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="section-heading"><div><h2>Recent rejections</h2><p class="text-secondary">Latest {{ entries|length }} entries for this process.</p></div></div>
+  <div class="table-wrap">
+    <table class="table align-middle">
+      <thead><tr><th>Time (UTC)</th><th>Address</th><th>Method</th><th>Path</th><th>Rule</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for entry in entries %}
+        <tr>
+          <td><small>{{ entry.at.strftime('%d %b %H:%M:%S') }}</small></td>
+          <td><small>{{ entry.ip }}</small></td>
+          <td><small>{{ entry.method }}</small></td>
+          <td><small class="text-break">{{ entry.path }}</small></td>
+          <td><span class="pill">{{ entry.rule }}</span></td>
+          <td>{{ entry.status }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-secondary">Nothing has been rejected since this process started.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</main>
+{% endblock %}

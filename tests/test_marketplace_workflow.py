@@ -360,7 +360,7 @@ class MarketplaceWorkflowTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json["database"], "connected")
         self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
-        self.assertEqual(response.headers["X-Frame-Options"], "SAMEORIGIN")
+        self.assertEqual(response.headers["X-Frame-Options"], "DENY")
         self.assertIn("Content-Security-Policy", response.headers)
 
     def test_marketplace_schema_compiles_for_mysql(self):

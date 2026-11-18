@@ -65,6 +65,21 @@ def create_app(config_object=None, config_overrides=None):
     csrf.init_app(app)
     login_manager.init_app(app)
 
+    from app.services.firewall import FirewallLog, RateLimiter, screen_request
+
+    app.extensions["rate_limiter"] = RateLimiter({
+        "global": (app.config["RATE_LIMIT_GLOBAL"], app.config["RATE_LIMIT_WINDOW_SECONDS"]),
+        "write": (app.config["RATE_LIMIT_WRITE"], app.config["RATE_LIMIT_WINDOW_SECONDS"]),
+        "auth": (app.config["RATE_LIMIT_AUTH"], app.config["RATE_LIMIT_WINDOW_SECONDS"]),
+    })
+    app.extensions["firewall_log"] = FirewallLog()
+
+    @app.before_request
+    def firewall():
+        if app.config.get("FIREWALL_ENABLED", True):
+            return screen_request()
+        return None
+
     # Import models before registering migrations so Alembic can discover metadata.
     from app import models  # noqa: F401
     from app.routes.main import main_bp
@@ -168,17 +183,21 @@ def create_app(config_object=None, config_overrides=None):
     @app.after_request
     def add_security_headers(response):
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+        response.headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
+        response.headers.setdefault("X-Permitted-Cross-Domain-Policies", "none")
+        response.headers.setdefault("X-Download-Options", "noopen")
         response.headers.setdefault(
             "Content-Security-Policy",
-            "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; object-src 'none'; "
+            "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; "
             "img-src 'self' data:; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
             "script-src 'self' https://cdn.jsdelivr.net",
         )
-        if app.config.get("SESSION_COOKIE_SECURE") and request.is_secure:
+        if request.is_secure:
             response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
         return response
 

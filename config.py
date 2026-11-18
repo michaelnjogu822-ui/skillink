@@ -30,6 +30,17 @@ class Config:
     # which the rate limiter needs to see the real client address.
     TRUSTED_PROXY_COUNT = int(os.environ.get("TRUSTED_PROXY_COUNT", "0"))
     LOGIN_MAX_FAILURES = int(os.environ.get("LOGIN_MAX_FAILURES", "5"))
+    # Application-layer firewall (app/services/firewall.py).
+    FIREWALL_ENABLED = env_flag("FIREWALL_ENABLED", "true")
+    RATE_LIMIT_WINDOW_SECONDS = int(os.environ.get("RATE_LIMIT_WINDOW_SECONDS", "60"))
+    RATE_LIMIT_GLOBAL = int(os.environ.get("RATE_LIMIT_GLOBAL", "300"))
+    RATE_LIMIT_WRITE = int(os.environ.get("RATE_LIMIT_WRITE", "60"))
+    RATE_LIMIT_AUTH = int(os.environ.get("RATE_LIMIT_AUTH", "20"))
+    ALLOWED_HOSTS = tuple(
+        host.strip().lower()
+        for host in os.environ.get("ALLOWED_HOSTS", "").split(",")
+        if host.strip()
+    )
     LOGIN_WINDOW_SECONDS = int(os.environ.get("LOGIN_WINDOW_SECONDS", "300"))
     # Payment provider used by the escrow service. Only "simulated" ships with
     # the project; a real provider registers itself in app/services/escrow.py.

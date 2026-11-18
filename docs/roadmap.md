@@ -135,13 +135,33 @@ Acceptance criteria - met:
   deployment, and uses the real client address behind one trusted proxy.
 - Deployment steps and a smoke-test checklist are documented.
 
-## Phase 6 - Security hardening and threat model  (APPROVED)
+## Phase 6 - Security hardening and threat model  (COMPLETE)
 
 **Goal:** defend the application against the threats a public marketplace attracts.
 
-Scope: an application-layer firewall (per-address rate limits, scanner path blocking, trusted
-proxy handling, request size and content-type checks), tightened security headers, and a written
-threat model mapping the OWASP Top 10 to the controls implemented here, each with a test.
+Delivered:
+
+- `app/services/firewall.py`: one `before_request` hook that enforces `ALLOWED_HOSTS`, refuses
+  unusual methods, blocks scanner paths and classic injection payloads, rejects oversized or
+  wrongly-typed bodies, and applies fixed-window rate limits for all requests, writes and
+  authentication. Every rejection is logged with the rule that fired.
+- `/admin/security`: an admin-only view of recent rejections, per-rule counts and the live
+  firewall configuration.
+- Tightened headers: `X-Frame-Options: DENY`, CSP `frame-ancestors 'none'`, COOP, CORP,
+  `X-Permitted-Cross-Domain-Policies`, `X-Download-Options`, and HSTS over HTTPS.
+- `docs/security.md`: assets, actors and trust boundaries, a STRIDE table, the OWASP Top 10
+  mapping, the firewall rule table, the known limits of an in-process firewall, residual risks
+  and an incident-response checklist.
+- 23 new tests in `tests/test_firewall.py`; the suite is 108 tests.
+
+Acceptance criteria - met:
+
+- Scanner paths, traversal, injection payloads, TRACE, JSON bodies on form endpoints and oversized
+  uploads are refused with the documented status codes.
+- Rate limits block at the configured threshold, recover after the window, are tighter for
+  authentication and writes, and exempt health checks and static assets.
+- Legitimate searches, pages and form submissions still work.
+- Administrators can inspect what was blocked; other roles cannot.
 
 ## Phase 7 - Optional enhancements
 

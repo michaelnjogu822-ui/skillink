@@ -76,6 +76,15 @@ File uploads are limited to 5 MB and accept PNG, JPG/JPEG or WEBP profile and po
 
 Freelancer job suggestions match the skills saved on the profile, then fill any remaining slots with the latest open jobs. This is a transparent keyword match, not an AI ranking system.
 
+## Security
+
+Security controls and their tests are documented in [docs/security.md](docs/security.md). In short:
+scrypt password hashing, per-account lockout and per-address rate limits, an application firewall
+that refuses scanner paths, injection payloads, unknown hostnames and oversized bodies, CSRF on
+every form, role and ownership checks on every route, hardened response headers, and a production
+configuration that refuses to start with a weak secret or insecure cookies. Administrators review
+recent rejections at `/admin/security`.
+
 ## Tests
 
 Run the integration suite with:
